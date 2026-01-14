@@ -1,40 +1,62 @@
 
 import { renderDeals } from './views/deals.js';
 import { renderDealDetails } from './views/details.js';
-import { Store } from './store.js';
+import { renderLogin } from './views/login.js';
+import { Auth } from './auth.js';
 import { showToast, showConfirmModal, showLoader, hideLoader } from './utils.js';
 
 const appContainer = document.getElementById('app');
+const mainNav = document.getElementById('main-nav');
 const backBtn = document.getElementById('nav-back-btn');
-const migrationTools = document.getElementById('migration-tools');
-const btnMigrate = document.getElementById('btn-migrate-data');
-const btnClearLocal = document.getElementById('btn-clear-local-data');
+const logoutBtn = document.getElementById('btn-logout');
+const profileNickname = document.getElementById('display-nickname');
+const adminIndicator = document.getElementById('admin-indicator');
 
 window.app = window.app || {};
 window.app.navigateTo = navigateTo;
 
 export async function navigateTo(view, params = {}) {
     if (!appContainer) return;
-    showLoader("페이지를 불러오는 중...");
-    if (view === 'deals') {
-        backBtn.classList.add('hidden');
-        appContainer.innerHTML = '';
-        await renderDeals(appContainer);
-    } else if (view === 'details') {
-        backBtn.classList.remove('hidden');
-        appContainer.innerHTML = '';
-        await renderDealDetails(appContainer, params.id, params.tab);
+    
+    // Auth Check
+    if (view !== 'login' && !Auth.isLoggedIn()) {
+        return navigateTo('login');
     }
+
+    showLoader("로딩 중...");
+
+    if (view === 'login') {
+        mainNav.classList.add('hidden');
+        appContainer.innerHTML = '';
+        renderLogin(appContainer);
+    } else {
+        mainNav.classList.remove('hidden');
+        updateUserUI();
+        
+        if (view === 'deals') {
+            backBtn.classList.add('hidden');
+            appContainer.innerHTML = '';
+            await renderDeals(appContainer);
+        } else if (view === 'details') {
+            backBtn.classList.remove('hidden');
+            appContainer.innerHTML = '';
+            await renderDealDetails(appContainer, params.id, params.tab);
+        }
+    }
+
     window.scrollTo(0, 0);
     hideLoader();
-    checkLocalDataStatus();
 }
 
-function checkLocalDataStatus() {
-    if (Store.hasLocalData()) {
-        migrationTools.classList.remove('hidden');
-    } else {
-        migrationTools.classList.add('hidden');
+function updateUserUI() {
+    const user = Auth.getCurrentUser();
+    if (user && profileNickname) {
+        profileNickname.textContent = user.nickname;
+        if (user.role === 'admin') {
+            adminIndicator.classList.remove('hidden');
+        } else {
+            adminIndicator.classList.add('hidden');
+        }
     }
 }
 
@@ -42,30 +64,20 @@ async function init() {
     if (backBtn) backBtn.addEventListener('click', () => navigateTo('deals'));
     const navLogo = document.getElementById('nav-logo');
     if (navLogo) navLogo.addEventListener('click', () => navigateTo('deals'));
-    if (btnMigrate) {
-        btnMigrate.addEventListener('click', async () => {
-            showConfirmModal("로컬 데이터를 Firestore로 이동하시겠습니까?", async () => {
-                showLoader("데이터 마이그레이션 중...");
-                try {
-                    const count = await Store.migrateToFirestore();
-                    showToast(`${count}건의 마이그레이션 완료`, 'success');
-                    await navigateTo('deals');
-                } catch (e) { showToast("마이그레이션 실패: " + e.message, 'error'); }
-                finally { hideLoader(); }
+    
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            showConfirmModal("로그아웃 하시겠습니까?", () => {
+                Auth.logout();
+                navigateTo('login');
+                showToast("로그아웃 되었습니다.", "info");
             });
         });
     }
-    if (btnClearLocal) {
-        btnClearLocal.addEventListener('click', () => {
-            showConfirmModal("로컬 데이터를 삭제하시겠습니까?", () => {
-                Store.clearLocalData();
-                showToast("삭제되었습니다.", 'success');
-                checkLocalDataStatus();
-            });
-        });
-    }
-    await navigateTo('deals');
+
+    await navigateTo(Auth.isLoggedIn() ? 'deals' : 'login');
 }
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else { init(); }
