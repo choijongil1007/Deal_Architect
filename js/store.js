@@ -1,6 +1,6 @@
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, query, orderBy, where, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { Auth } from './auth.js';
 
 const COLLECTION_NAME = 'deals';
@@ -12,19 +12,29 @@ export const Store = {
 
         let q;
         if (user.role === 'admin') {
-            q = query(collection(db, COLLECTION_NAME), orderBy("updatedAt", "desc"));
+            q = query(collection(db, COLLECTION_NAME));
         } else {
+            // orderBy를 제거하여 복합 인덱스 요구사항을 우회합니다.
             q = query(
                 collection(db, COLLECTION_NAME), 
-                where("owner", "==", user.nickname),
-                orderBy("updatedAt", "desc")
+                where("owner", "==", user.nickname)
             );
         }
         
         const snapshot = await getDocs(q);
         let deals = [];
-        snapshot.forEach((doc) => { deals.push({ id: doc.id, ...doc.data() }); });
-        return deals.map(deal => Store.ensureDealStructure(deal));
+        snapshot.forEach((doc) => { 
+            deals.push({ id: doc.id, ...doc.data() }); 
+        });
+
+        // 클라이언트 사이드 정렬 (updatedAt 기준 내림차순)
+        return deals
+            .map(deal => Store.ensureDealStructure(deal))
+            .sort((a, b) => {
+                const dateA = a.updatedAt?.seconds ? a.updatedAt.seconds * 1000 : new Date(a.updatedAt || 0).getTime();
+                const dateB = b.updatedAt?.seconds ? b.updatedAt.seconds * 1000 : new Date(b.updatedAt || 0).getTime();
+                return dateB - dateA;
+            });
     },
 
     getDeal: async (id) => {
