@@ -1,5 +1,6 @@
 
 import { Store } from '../store.js';
+import { Auth } from '../auth.js';
 import { generateId, showToast, showConfirmModal } from '../utils.js';
 import { STAGE_DEFINITIONS } from '../config.js';
 
@@ -8,6 +9,7 @@ let editTargetId = null;
 
 export async function renderDeals(container) {
     const deals = await Store.getDeals();
+    const currentUser = Auth.getCurrentUser();
     
     const inProgressDeals = deals.filter(d => d.status === 'active' || !d.status);
     const closedDeals = deals.filter(d => d.status === 'won' || d.status === 'lost');
@@ -90,7 +92,7 @@ export async function renderDeals(container) {
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-400 mb-1.5 ml-0.5">내부 담당자</label>
-                            <input type="text" name="internalContact" class="input-enterprise !bg-slate-800 !border-white/10 !text-white w-full">
+                            <input type="text" name="internalContact" class="input-enterprise !bg-slate-800 !border-white/10 !text-white w-full" value="${currentUser?.nickname || ''}">
                         </div>
                     </div>
                     <div>
