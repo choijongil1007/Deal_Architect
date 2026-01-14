@@ -1,0 +1,7 @@
+{
+  "name": "Deal Architect v2",
+  "description": "Stage-based PreSales Decision Support System built with Vanilla JS",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
