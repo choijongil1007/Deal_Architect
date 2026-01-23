@@ -1,4 +1,3 @@
-
 import { Store } from '../store.js';
 import { callGemini } from '../api.js';
 import { showToast, setButtonLoading, showConfirmModal, cleanJSONString } from '../utils.js';
@@ -13,8 +12,12 @@ export async function renderDealQualification(container, dealId, stageId = 'awar
     const deal = await Store.getDeal(dealId);
     if (!deal) return;
 
+    // 평가(Evaluation)나 구매(Purchase) 단계에서는 고려(Consideration) 단계의 데이터를 보여줌
     let effectiveStageId = stageId === 'evaluation' || stageId === 'purchase' ? 'consideration' : stageId;
-    let isReadOnly = stageId !== 'consideration';
+    
+    // 종료 상태이거나 고려 단계가 아니면 읽기 전용
+    const isClosed = deal.status === 'won' || deal.status === 'lost';
+    let isReadOnly = stageId !== 'consideration' || isClosed;
 
     if (!deal.assessment[effectiveStageId]) {
         deal.assessment[effectiveStageId] = {
@@ -73,11 +76,13 @@ export async function renderDealQualification(container, dealId, stageId = 'awar
                 </div>
             </div>
 
+            ${!isReadOnly ? `
             <div class="flex justify-center pt-4">
                 <button id="btn-show-result-qual" class="bg-slate-900 text-white px-12 py-3.5 rounded-2xl font-bold shadow-lg hover:shadow-slate-200 active:scale-95 transition-all flex items-center gap-3">
                     <i class="fa-solid fa-chart-line"></i> 최종 결과 분석 및 Go/No-Go 판정
                 </button>
             </div>
+            ` : ''}
             
             <div id="assessment-result-container-qual" class="${isCompleted ? '' : 'hidden'} mt-6 mb-10"></div>
         </div>
@@ -212,7 +217,6 @@ function attachEvents(container, deal, stageId, isReadOnly, onUpdate) {
             }
             setButtonLoading(btnRefreshAi, true, "AI 분석 중...");
             try {
-                // Construct items list for Gemini
                 const itemsList = [];
                 ['biz', 'tech'].forEach(type => {
                     ASSESSMENT_CONFIG[type].categories.forEach(cat => {
@@ -239,8 +243,6 @@ ${itemsList.map(item => `- ${item.id}: ${item.label}`).join('\n')}
 Return JSON ONLY: { "recommendations": { "item_id": { "score": number, "reason": "string" } } }. Use Korean for reasons.`; 
 
                 let result = await callGemini(prompt);
-                
-                // Fallback parsing logic for inconsistent AI/Proxy responses
                 if (typeof result === 'string') {
                     try {
                         const cleaned = cleanJSONString(result);
@@ -249,8 +251,6 @@ Return JSON ONLY: { "recommendations": { "item_id": { "score": number, "reason":
                         console.error("Manual JSON parse failed:", e);
                     }
                 }
-
-                // AI might sometimes omit the "recommendations" root key despite prompt instructions
                 const recommendations = result?.recommendations || (result && typeof result === 'object' ? result : null);
 
                 if (recommendations && typeof recommendations === 'object') {
@@ -259,7 +259,6 @@ Return JSON ONLY: { "recommendations": { "item_id": { "score": number, "reason":
                     stageAssessment.aiRecommendations = recommendations;
                     
                     Object.entries(recommendations).forEach(([id, rec]) => {
-                        // Ensure we have a valid recommendation object with a score
                         if (rec && typeof rec.score === 'number') {
                             const type = (id.startsWith('budget') || id.startsWith('authority') || id.startsWith('need') || id.startsWith('timeline')) ? 'biz' : 'tech';
                             if (stageAssessment[type]) {
@@ -281,26 +280,29 @@ Return JSON ONLY: { "recommendations": { "item_id": { "score": number, "reason":
                 setButtonLoading(btnRefreshAi, false);
             }
         });
-    }
 
-    document.getElementById('btn-show-result-qual').onclick = async () => {
-        const currentDeal = await Store.getDeal(currentDealId);
-        const stageData = currentDeal.assessment[stageId];
-        const isFirstCompletion = !stageData.isCompleted;
-        stageData.isCompleted = true;
-        await Store.saveDeal(currentDeal);
-        const scores = calculateScores(stageData);
-        const resDiv = document.getElementById('assessment-result-container-qual');
-        resDiv.innerHTML = renderResultContent(scores, isReadOnly);
-        resDiv.classList.remove('hidden');
-        if (isFirstCompletion) {
-            await saveAssessmentReport(currentDeal, stageId, scores);
+        const showResultBtn = document.getElementById('btn-show-result-qual');
+        if (showResultBtn) {
+            showResultBtn.onclick = async () => {
+                const currentDeal = await Store.getDeal(currentDealId);
+                const stageData = currentDeal.assessment[stageId];
+                const isFirstCompletion = !stageData.isCompleted;
+                stageData.isCompleted = true;
+                await Store.saveDeal(currentDeal);
+                const scores = calculateScores(stageData);
+                const resDiv = document.getElementById('assessment-result-container-qual');
+                resDiv.innerHTML = renderResultContent(scores, isReadOnly);
+                resDiv.classList.remove('hidden');
+                if (isFirstCompletion) {
+                    await saveAssessmentReport(currentDeal, stageId, scores);
+                }
+                if (onUpdate) await onUpdate();
+                showToast('분석이 완료되었습니다.', 'success');
+                resDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                bindSaveReportEvent();
+            };
         }
-        if (onUpdate) await onUpdate();
-        showToast('분석이 완료되었습니다.', 'success');
-        resDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        bindSaveReportEvent();
-    };
+    }
 }
 
 async function saveAssessmentReport(deal, stageId, scores) {
@@ -436,32 +438,22 @@ function renderResultContent(scores, isReadOnly) {
                     <div class="text-[10px] font-black text-slate-500 mb-6 uppercase tracking-[0.3em]">Qualification Quadrant</div>
                     
                     <div class="relative w-full max-w-[340px] aspect-square">
-                        <!-- Y-Axis Label -->
                         <div class="absolute -left-10 top-1/2 -rotate-90 origin-center text-[11px] font-bold text-slate-500 whitespace-nowrap">Tech. Fit</div>
-                        
-                        <!-- Main Quadrant Box -->
                         <div class="w-full h-full relative quadrant-grid bg-white/5 border border-slate-700/50 rounded-2xl overflow-hidden">
-                            <!-- Helper Lines -->
                             <div class="absolute inset-0 pointer-events-none">
                                 <div class="absolute top-1/2 left-0 w-full h-px bg-white/10"></div>
                                 <div class="absolute left-1/2 top-0 w-px h-full bg-white/10"></div>
                             </div>
-                            
-                            <!-- Quadrant Text Guide -->
                             <div class="absolute inset-0 grid grid-cols-2 grid-rows-2 pointer-events-none opacity-40">
                                 <div class="flex items-center justify-center text-center p-2 text-[13px] font-bold text-slate-400 border-r border-b border-white/5">Tech OK, Biz Risky</div>
                                 <div class="flex items-center justify-center text-center p-2 text-[13px] font-bold text-emerald-400 border-b border-white/5">Go</div>
                                 <div class="flex items-center justify-center text-center p-2 text-[13px] font-bold text-rose-400 border-r border-white/5">Drop</div>
                                 <div class="flex items-center justify-center text-center p-2 text-[13px] font-bold text-slate-400">Biz OK, Tech Risky</div>
                             </div>
-
-                            <!-- User Result Dot -->
                             <div class="quadrant-dot shadow-[0_0_30px_rgba(79,70,229,0.7)] border-4 border-white" 
                                  style="left: ${scores.bizScore}%; top: ${100 - scores.techScore}%; background-color: #6366f1; width: 24px; height: 24px; transform: translate(-50%, -50%); z-index: 50;">
                             </div>
                         </div>
-
-                        <!-- X-Axis Label -->
                         <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[11px] font-bold text-slate-500 whitespace-nowrap">Biz Fit</div>
                     </div>
                 </div>

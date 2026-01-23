@@ -1,4 +1,3 @@
-
 export const STAGE_DEFINITIONS = {
     awareness: { id: 'awareness', label: '1. 인식 (Awareness)', keyQuestion: '이 딜을 더 볼 가치가 있는가?', nextStage: 'consideration' },
     consideration: { id: 'consideration', label: '2. 고려 (Consideration)', keyQuestion: '리소스를 써도 되는가?', nextStage: 'evaluation' },
@@ -9,7 +8,7 @@ export const STAGE_DEFINITIONS = {
 export const FUNCTION_ACCESS_MATRIX = {
     dashboard: { awareness: 'view', consideration: 'view', evaluation: 'view', purchase: 'view' },
     discovery: { awareness: 'edit', consideration: 'edit', evaluation: 'edit', purchase: 'edit' },
-    assessment: { awareness: 'hide', consideration: 'edit', evaluation: 'view', purchase: 'hide' },
+    assessment: { awareness: 'hide', consideration: 'edit', evaluation: 'view', purchase: 'view' },
     solutionMap: { awareness: 'hide', consideration: 'edit', evaluation: 'edit', purchase: 'view' },
     competitive: { awareness: 'hide', consideration: 'hide', evaluation: 'edit', purchase: 'view' },
     strategy: { awareness: 'hide', consideration: 'hide', evaluation: 'edit', purchase: 'edit' },

@@ -1,4 +1,3 @@
-
 import { Store } from '../store.js';
 import { renderDiscovery } from './discovery.js';
 import { renderDealQualification } from './dealQualification.js';
@@ -196,8 +195,21 @@ function validateStageTransition(deal) {
 
 function renderSidebarMenu(deal) {
     const currentStageId = deal.currentStage;
+    const isClosed = deal.status === 'won' || deal.status === 'lost';
+    
     const menuHtml = MENU_ITEMS.map(item => {
-        const access = FUNCTION_ACCESS_MATRIX[item.id][currentStageId];
+        let access = FUNCTION_ACCESS_MATRIX[item.id][currentStageId];
+        
+        // 종료 상태(Won/Lost)에서 Deal Qualification이 보이도록 처리
+        if (isClosed && item.id === 'assessment' && access === 'hide') {
+            access = 'view';
+        }
+        
+        // 종료 상태에서는 모든 접근 권한을 'view'로 하향 조정
+        if (isClosed && access === 'edit') {
+            access = 'view';
+        }
+
         if (access === 'hide') return '';
         
         let label = item.label;
@@ -212,6 +224,12 @@ function renderSidebarMenu(deal) {
 
     const { canMove, checks } = validateStageTransition(deal);
     const checklistHtml = checks.map(c => `<div class="flex items-center justify-between text-[11px] mb-1.5 ${c.valid ? 'text-slate-400 opacity-60' : 'text-slate-500 font-bold'}"><span class="flex items-center gap-1.5"><i class="fa-solid ${c.valid ? 'fa-check text-emerald-500' : 'fa-circle text-[5px] text-slate-300'}"></i>${c.label}</span></div>`).join('');
+    
+    // 종료 상태에서는 단계 이동 버튼 숨김
+    if (isClosed) {
+        return `<nav class="space-y-0.5">${menuHtml}</nav>`;
+    }
+
     const btnClass = canMove ? "border-2 border-indigo-100 text-indigo-800 hover:bg-indigo-50 hover:border-indigo-200 shadow-sm" : "border border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed opacity-80";
     const btnLabel = (currentStageId === 'purchase') ? 'Deal 종료 (Won/Lost)' : '다음 단계로';
     const btnDisabled = canMove ? '' : 'disabled';
@@ -250,7 +268,7 @@ function renderDashboard(container, deal) {
             ],
             extraInfo: "PoC가 검증이라면, 제안서는 그 검증을 결정 가능하게 만드는 문서다.",
             avoid: ["성공 기준 없는 PoC", "모든 요구사항 수용", "평가 결과가 반영되지 않은 제안서", "“일단 써달라”는 요청에 끌려가는 문서 작성"],
-            coreGoal: "PoC와 제안서를 하나의 승리 구조로 통합하라"
+            coreGoal: "PoC와 제안서는 하나의 승리 구조로 통합하라"
         },
         purchase: {
             purpose: "결정을 안심하고 승인할 수 있게 돕는다.",
