@@ -38,6 +38,7 @@ export const ASSESSMENT_CONFIG = {
         categories: [
             { id: 'req', label: '요구사항 적합성', items: ['필수 요구사항 충족도', '유스케이스 적합성'], defaultWeight: 30 },
             { id: 'arch', label: '아키텍처', items: ['호환성', '보안 준수'], defaultWeight: 25 },
+            { id: 'data', label: '데이터 및 연동', items: ['데이터 마이그레이션', '인터페이스 적합성'], defaultWeight: 25 },
             { id: 'ops', label: '운영 가능성', items: ['구현 난이도', '유지보수'], defaultWeight: 20 }
         ]
     }
