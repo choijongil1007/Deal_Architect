@@ -204,21 +204,59 @@ function renderNodes(container, layoutNodes) {
                 if (node.data?.painPoints?.length > 0) content += `<div class="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" title="Pain Points"></div>`;
                 el.innerHTML = content;
                 el.addEventListener('click', () => showSolutionDetailModal(node.data));
+                
+                // Tooltip Events
                 el.addEventListener('mouseenter', () => {
                     if (tooltip) {
-                        tooltip.innerHTML = `<div class="flex flex-col gap-1 min-w-[140px]"><span class="text-xs text-slate-400 font-bold uppercase tracking-wide">${node.data?.manufacturer || 'Unknown'}</span><span class="text-lg font-bold text-white leading-tight">${node.name}</span><div class="mt-2 pt-2 border-t border-slate-600 flex justify-between items-end"><span class="text-xs text-slate-400">점유율</span><span class="text-2xl font-extrabold text-yellow-400">${node.share}%</span></div></div>`;
+                        const m = node.data?.manufacturer || 'Unknown Manufacturer';
+                        const s = node.share || 0;
+                        tooltip.innerHTML = `
+                            <div class="flex flex-col gap-1 min-w-[160px]">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                    <span class="text-[10px] text-slate-400 font-black uppercase tracking-widest">${m}</span>
+                                </div>
+                                <h4 class="text-lg font-black text-white leading-tight mb-3 border-b border-white/10 pb-2">${node.name}</h4>
+                                <div class="flex justify-between items-end">
+                                    <div class="flex flex-col">
+                                        <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wider">시장 점유율</span>
+                                        <span class="text-3xl font-black text-indigo-400 leading-none mt-0.5">${s}<span class="text-sm ml-0.5 text-slate-500">%</span></span>
+                                    </div>
+                                    ${node.data?.painPoints?.length > 0 ? `
+                                        <div class="flex flex-col items-end">
+                                            <span class="text-[9px] text-rose-500 font-bold uppercase tracking-wider">Pain Points</span>
+                                            <span class="text-sm font-black text-rose-400">${node.data.painPoints.length}건</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
                         tooltip.classList.remove('hidden');
                     }
                 });
+                
                 el.addEventListener('mousemove', (e) => {
                     if (tooltip && !tooltip.classList.contains('hidden')) {
-                        const offset = 20; let left = e.clientX + offset, top = e.clientY + offset;
-                        if (left + tooltip.offsetWidth > window.innerWidth) left = e.clientX - tooltip.offsetWidth - offset;
-                        if (top + tooltip.offsetHeight > window.innerHeight) top = e.clientY - tooltip.offsetHeight - offset;
-                        tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+                        const offset = 20;
+                        let left = e.clientX + offset;
+                        let top = e.clientY + offset;
+                        
+                        // Viewport collision detection
+                        if (left + tooltip.offsetWidth > window.innerWidth - 20) {
+                            left = e.clientX - tooltip.offsetWidth - offset;
+                        }
+                        if (top + tooltip.offsetHeight > window.innerHeight - 20) {
+                            top = e.clientY - tooltip.offsetHeight - offset;
+                        }
+                        
+                        tooltip.style.left = `${left}px`;
+                        tooltip.style.top = `${top}px`;
                     }
                 });
-                el.addEventListener('mouseleave', () => { if (tooltip) tooltip.classList.add('hidden'); });
+                
+                el.addEventListener('mouseleave', () => {
+                    if (tooltip) tooltip.classList.add('hidden');
+                });
             }
             container.appendChild(el);
         }
