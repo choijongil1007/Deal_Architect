@@ -33,7 +33,7 @@ export async function renderDiscovery(container, dealId, targetStage = null, onU
         </div>
     `;
 
-    attachEvents(dealId, onUpdate);
+    attachEvents(container, dealId, onUpdate);
 }
 
 function renderStage(stageConfig, data, isExpanded = false, isReadOnly = false) {
@@ -206,60 +206,33 @@ function renderResult(result, isStale, stageId) {
     `;
 }
 
-function attachEvents(dealId, onUpdate) {
-    document.querySelectorAll('.toggle-header').forEach(header => {
-        header.addEventListener('click', () => {
+function attachEvents(container, dealId, onUpdate) {
+    // 1. 이벤트 위임을 통한 전체 클릭 핸들러
+    container.addEventListener('click', async (e) => {
+        const target = e.target;
+        
+        // 1-1. 토글 헤더 (아코디언)
+        const header = target.closest('.toggle-header');
+        if (header) {
             const card = header.parentElement;
             const content = card.querySelector('.toggle-content');
             const icon = card.querySelector('.icon-chevron');
-            content.classList.toggle('hidden');
-            icon.style.transform = content.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-        });
-    });
+            const isHidden = content.classList.toggle('hidden');
+            icon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+            return;
+        }
 
-    document.querySelectorAll('.input-enterprise').forEach(input => {
-        if (input.tagName === 'TEXTAREA') { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
-        input.addEventListener('input', async (e) => {
-            const deal = await Store.getDeal(dealId);
-            const stageId = e.target.dataset.stage;
-            const key = e.target.dataset.key;
-            
-            const card = e.target.closest('.stage-card');
-            if (card) {
-                const btn = card.querySelector('.btn-analyze');
-                const badge = card.querySelector('.status-badge');
-                const hasResult = !!deal.discovery[stageId]?.result;
-
-                if (btn && btn.disabled) {
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-slate-400');
-                    btn.classList.add('bg-slate-900', 'hover:bg-indigo-600', 'shadow-md', 'active:scale-95');
-                }
-
-                if (badge && hasResult) {
-                    badge.innerHTML = '<span class="text-xs text-amber-600 font-bold flex items-center gap-1.5 mt-0.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100"><i class="fa-solid fa-circle-exclamation"></i> 변경사항 있음</span>';
-                }
-            }
-
-            if (deal.discovery[stageId]) {
-                deal.discovery[stageId][key] = e.target.value;
-                deal.discovery[stageId].frozen = false;
-                await Store.saveDeal(deal);
-                if (onUpdate) await onUpdate();
-            }
-        });
-    });
-
-    document.querySelectorAll('.btn-analyze').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const stageId = btn.dataset.stage;
+        // 1-2. 인사이트 생성 (Analyze)
+        const btnAnalyze = target.closest('.btn-analyze');
+        if (btnAnalyze) {
+            const stageId = btnAnalyze.dataset.stage;
             const deal = await Store.getDeal(dealId);
             const stageData = deal.discovery[stageId];
             if (!stageData.behavior && !stageData.problem) { showToast('정보를 입력해주세요.', 'error'); return; }
 
-            const card = btn.closest('.stage-card');
+            const card = btnAnalyze.closest('.stage-card');
             const resultArea = card.querySelector('.result-area');
-            setButtonLoading(btn, true, "분석 중...");
+            setButtonLoading(btnAnalyze, true, "분석 중...");
             resultArea.innerHTML = `<div class="animate-pulse flex flex-col items-center py-10"><div class="spinner border-indigo-500 w-8 h-8 mb-4"></div><p class="text-sm text-slate-500">AI 분석 중...</p></div>`;
 
             try {
@@ -292,45 +265,56 @@ Rules:
                     badge.innerHTML = '<span class="text-xs text-emerald-600 font-bold flex items-center gap-1.5 mt-0.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-circle-check"></i> 분석 완료</span>';
                 }
 
-                if (stageId === 'awareness') {
-                    const defBtn = resultArea.querySelector('.btn-gen-problem-def');
-                    if (defBtn) defBtn.onclick = () => generateProblemDefinition(dealId);
-                } else if (stageId === 'consideration') {
-                    const defBtn = resultArea.querySelector('.btn-gen-decision-pre');
-                    if (defBtn) defBtn.onclick = () => generateDecisionPreconditions(dealId);
-                } else if (stageId === 'evaluation') {
-                    const defBtn = resultArea.querySelector('.btn-gen-decision-crit');
-                    if (defBtn) defBtn.onclick = () => generateDecisionCriteria(dealId);
-                } else if (stageId === 'purchase') {
-                    const defBtn = resultArea.querySelector('.btn-gen-success-guide');
-                    if (defBtn) defBtn.onclick = () => generateProjectSuccessGuide(dealId);
-                }
-
                 showToast('분석 완료', 'success');
                 if (onUpdate) await onUpdate();
-            } catch (e) {
-                showToast(e.message, 'error');
+            } catch (err) {
+                showToast(err.message, 'error');
                 resultArea.innerHTML = '';
             } finally {
-                setButtonLoading(btn, false);
+                setButtonLoading(btnAnalyze, false);
+            }
+            return;
+        }
+
+        // 1-3. 보고서 생성 버튼들 (Event Delegation)
+        if (target.closest('.btn-gen-problem-def')) { generateProblemDefinition(dealId); return; }
+        if (target.closest('.btn-gen-decision-pre')) { generateDecisionPreconditions(dealId); return; }
+        if (target.closest('.btn-gen-decision-crit')) { generateDecisionCriteria(dealId); return; }
+        if (target.closest('.btn-gen-success-guide')) { generateProjectSuccessGuide(dealId); return; }
+    });
+
+    // 2. 텍스트 입력 및 자동 저장 (이벤트 위임 대신 개별 바인딩 유지 - 입력 성능 고려)
+    container.querySelectorAll('.input-enterprise').forEach(input => {
+        if (input.tagName === 'TEXTAREA') { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
+        input.addEventListener('input', async (e) => {
+            const deal = await Store.getDeal(dealId);
+            const stageId = e.target.dataset.stage;
+            const key = e.target.dataset.key;
+            
+            const card = e.target.closest('.stage-card');
+            if (card) {
+                const btn = card.querySelector('.btn-analyze');
+                const badge = card.querySelector('.status-badge');
+                const hasResult = !!deal.discovery[stageId]?.result;
+
+                if (btn && btn.disabled) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-slate-400');
+                    btn.classList.add('bg-slate-900', 'hover:bg-indigo-600', 'shadow-md', 'active:scale-95');
+                }
+
+                if (badge && hasResult) {
+                    badge.innerHTML = '<span class="text-xs text-amber-600 font-bold flex items-center gap-1.5 mt-0.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100"><i class="fa-solid fa-circle-exclamation"></i> 변경사항 있음</span>';
+                }
+            }
+
+            if (deal.discovery[stageId]) {
+                deal.discovery[stageId][key] = e.target.value;
+                deal.discovery[stageId].frozen = false;
+                await Store.saveDeal(deal);
+                if (onUpdate) await onUpdate();
             }
         });
-    });
-
-    document.querySelectorAll('.btn-gen-problem-def').forEach(btn => {
-        btn.onclick = () => generateProblemDefinition(dealId);
-    });
-
-    document.querySelectorAll('.btn-gen-decision-pre').forEach(btn => {
-        btn.onclick = () => generateDecisionPreconditions(dealId);
-    });
-
-    document.querySelectorAll('.btn-gen-decision-crit').forEach(btn => {
-        btn.onclick = () => generateDecisionCriteria(dealId);
-    });
-
-    document.querySelectorAll('.btn-gen-success-guide').forEach(btn => {
-        btn.onclick = () => generateProjectSuccessGuide(dealId);
     });
 }
 
@@ -341,25 +325,21 @@ function parseAiJsonResponse(resultRaw) {
     try {
         if (!resultRaw) return null;
         
-        // 만약 전체 API 응답 객체라면 후보 추출
         let textToParse = "";
         if (typeof resultRaw === 'object') {
             if (resultRaw.candidates && resultRaw.candidates[0]?.content?.parts[0]?.text) {
                 textToParse = resultRaw.candidates[0].content.parts[0].text;
             } else {
-                // 이미 필요한 데이터 형태인 경우
                 return resultRaw;
             }
         } else {
             textToParse = String(resultRaw);
         }
         
-        // JSON 문자열 정화 및 추출
         const cleaned = cleanJSONString(textToParse);
         return JSON.parse(cleaned);
     } catch (e) {
         console.error("AI JSON Parse Error:", e, resultRaw);
-        // 폴백: 최소한의 구조라도 생성하여 반환
         if (typeof resultRaw === 'string' && resultRaw.length > 50) {
             return { 
                 title: "보고서 (비정형)", 
@@ -372,12 +352,11 @@ function parseAiJsonResponse(resultRaw) {
 }
 
 /**
- * 정형화된 보고서 데이터를 HTML로 변환하여 렌더링합니다 (SaaS UI 컴포넌트 엔진)
+ * 정형화된 보고서 데이터를 HTML로 변환하여 렌더링합니다
  */
 function renderStructuredReport(data) {
     if (!data) return '<div class="text-rose-500 p-8 border border-rose-500/20 bg-rose-500/5 rounded-2xl">보고서 데이터를 불러올 수 없습니다.</div>';
     
-    // 데이터가 JSON 구조가 아닌 일반 텍스트인 경우를 위한 폴백
     if (typeof data === 'string' || (!data.sections && !data.title)) {
         const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
         return `
@@ -392,7 +371,7 @@ function renderStructuredReport(data) {
     
     if (data.summary) {
         html += `
-            <blockquote class="bg-indigo-900/10 border-l-4 border-indigo-500 p-8 rounded-2xl mb-12 flex gap-5">
+            <blockquote class="bg-indigo-900/10 border-l-4 border-indigo-50 p-8 rounded-2xl mb-12 flex gap-5">
                 <div class="text-indigo-500 text-4xl opacity-50 shrink-0 mt-1">
                     <i class="fa-solid fa-quote-left"></i>
                 </div>
@@ -785,7 +764,7 @@ Language: Korean. Return Markdown format text.`;
 }
 
 /**
- * 보고서 편집 모달 오픈 (JSON 데이터를 기반으로 SaaS UI 렌더링)
+ * 보고서 편집 모달 오픈
  */
 function openReportEditor(content, dealId, reportType, isJson = false) {
     const modal = document.getElementById('problem-def-modal');
@@ -813,7 +792,6 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
                 preview.innerHTML = `<div class="text-rose-400 p-10 bg-rose-500/10 rounded-xl border border-rose-500/20">
                     <h4 class="font-bold mb-2">JSON 데이터 형식 오류</h4>
                     <p class="text-sm">편집 탭에서 데이터를 올바른 JSON 형식으로 수정해주세요.</p>
-                    <pre class="mt-4 text-[10px] bg-black/40 p-4 rounded-lg overflow-x-auto">${e.message}</pre>
                 </div>`;
             }
         } else if (window.marked) {
@@ -824,8 +802,7 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
     };
     renderPreview();
 
-    // UI Toggle 로직
-    const showPreview = () => {
+    btnPreview.onclick = () => {
         preview.classList.remove('hidden');
         editor.classList.add('hidden');
         btnPreview.classList.add('bg-indigo-600', 'text-white');
@@ -835,7 +812,7 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
         renderPreview();
     };
 
-    const showEdit = () => {
+    btnEdit.onclick = () => {
         preview.classList.add('hidden');
         editor.classList.remove('hidden');
         btnEdit.classList.add('bg-indigo-600', 'text-white');
@@ -843,9 +820,6 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
         btnPreview.classList.remove('bg-indigo-600', 'text-white');
         btnPreview.classList.add('text-slate-400');
     };
-
-    btnPreview.onclick = showPreview;
-    btnEdit.onclick = showEdit;
 
     modal.classList.remove('hidden');
     requestAnimationFrame(() => {
@@ -871,13 +845,12 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
         else if (reportType === 'decision_criteria') reportTitle = "판단 기준 정의서";
         else if (reportType === 'success_guide') reportTitle = "프로젝트 성공 가이드";
         
-        // 시각화된 HTML을 그대로 저장
         renderPreview();
         const htmlToSave = preview.innerHTML;
 
         try {
             await Store.addReport(dealId, reportTitle, htmlToSave, reportType);
-            showToast("세련된 디자인의 보고서가 'Reports'에 저장되었습니다.", "success");
+            showToast("보고서가 'Reports'에 저장되었습니다.", "success");
             close();
         } catch (e) {
             showToast("저장 실패: " + e.message, "error");
