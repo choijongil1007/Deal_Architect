@@ -82,11 +82,12 @@
     </div>
     <div id="toast-container" class="fixed bottom-8 right-8 z-[70] flex flex-col gap-3 no-print"></div>
     <div id="global-modals">
+        <!-- Confirm Modal -->
         <div id="confirm-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
             <div id="confirm-modal-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
             <div id="confirm-modal-panel" class="relative bg-slate-900 rounded-xl shadow-modal p-6 max-w-sm w-full transform transition-all scale-95 opacity-0 border border-white/10">
                 <div class="flex flex-col items-center text-center">
-                    <div class="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/20">
+                    <div class="w-12 h-12 rounded-full bg-indigo-50/10 text-indigo-400 flex items-center justify-center mb-4 border border-indigo-500/20">
                         <i class="fa-solid fa-question text-xl"></i>
                     </div>
                     <h3 class="text-lg font-bold text-white mb-2">확인</h3>
@@ -95,6 +96,38 @@
                         <button id="confirm-modal-cancel" class="flex-1 bg-slate-800 text-slate-300 py-2.5 rounded-lg font-bold hover:bg-slate-700 transition-colors text-sm border border-white/5">취소</button>
                         <button id="confirm-modal-ok" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors text-sm shadow-sm">확인</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Problem Definition / Report Editor Modal -->
+        <div id="problem-def-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
+            <div id="problem-def-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
+            <div id="problem-def-panel" class="relative bg-slate-900 rounded-2xl shadow-modal w-full max-w-4xl h-[90vh] flex flex-col transform transition-all scale-95 opacity-0 border border-white/10 overflow-hidden">
+                <!-- Header -->
+                <div class="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-black/20">
+                    <h3 id="report-modal-title" class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice text-indigo-400"></i> 보고서 생성
+                    </h3>
+                    <div class="flex gap-2 bg-slate-800 p-1 rounded-lg border border-white/5">
+                        <button id="btn-problem-def-preview-mode" class="px-4 py-1.5 rounded-md text-xs font-bold bg-indigo-600 text-white transition-all">미리보기</button>
+                        <button id="btn-problem-def-edit-mode" class="px-4 py-1.5 rounded-md text-xs font-bold text-slate-400 hover:text-white transition-all">직접 수정</button>
+                    </div>
+                    <button id="problem-def-cancel" class="text-slate-500 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <!-- Body -->
+                <div class="flex-1 overflow-hidden p-6 bg-slate-900 flex flex-col">
+                    <div id="problem-def-preview" class="flex-1 overflow-y-auto prose prose-invert prose-indigo max-w-none p-4 md:p-8 bg-slate-900 rounded-xl custom-scrollbar">
+                        <!-- Rendered Markdown Content Here -->
+                    </div>
+                    <textarea id="problem-def-editor" class="hidden flex-1 w-full bg-slate-800 text-slate-200 p-8 rounded-xl font-mono text-sm border border-white/5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none custom-scrollbar"></textarea>
+                </div>
+                <!-- Footer -->
+                <div class="px-8 py-5 border-t border-white/5 bg-black/20 flex justify-end gap-3">
+                    <button id="btn-save-problem-def-cancel" class="px-6 py-2.5 bg-slate-800 border border-white/5 text-slate-300 rounded-xl font-bold hover:bg-slate-700 transition-all text-sm">취소</button>
+                    <button id="btn-save-problem-def-report" class="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 shadow-lg transition-all text-sm transform active:scale-95">보고서 저장</button>
                 </div>
             </div>
         </div>
