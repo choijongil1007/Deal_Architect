@@ -1,4 +1,3 @@
-
 import { db } from './firebase-config.js';
 import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { Auth } from './auth.js';
@@ -60,7 +59,9 @@ export const Store = {
         if (!deal.id) deal.id = Date.now().toString(36);
         if (!deal.owner) deal.owner = user.nickname; // Assign owner on create
 
-        await setDoc(doc(db, COLLECTION_NAME, deal.id), { ...deal, updatedAt: serverTimestamp() }, { merge: true });
+        // 중요: 삭제(delete)된 속성을 Firestore 서버에 반영하기 위해 merge: true를 제거합니다.
+        // 이 앱의 'Fetch-Modify-Save' 패턴에서는 전체 객체를 덮어쓰는 방식이 정확한 상태 동기화를 보장합니다.
+        await setDoc(doc(db, COLLECTION_NAME, deal.id), { ...deal, updatedAt: serverTimestamp() });
     },
 
     deleteDeal: async (id) => { 
@@ -116,7 +117,9 @@ export const Store = {
     deleteDomain: async (id, domainName) => {
         const deal = await Store.getDeal(id);
         if (!deal || !domainName) return false;
-        delete deal.solutionMapContent[domainName];
+        if (deal.solutionMapContent) {
+            delete deal.solutionMapContent[domainName];
+        }
         await Store.saveDeal(deal);
         return true;
     },
@@ -142,7 +145,9 @@ export const Store = {
     deleteCategory: async (id, domainName, categoryName) => {
         const deal = await Store.getDeal(id);
         if (!deal || !domainName || !categoryName) return false;
-        delete deal.solutionMapContent[domainName][categoryName];
+        if (deal.solutionMapContent[domainName]) {
+            delete deal.solutionMapContent[domainName][categoryName];
+        }
         await Store.saveDeal(deal);
         return true;
     },
