@@ -100,6 +100,111 @@
             </div>
         </div>
 
+        <!-- Warning Modal -->
+        <div id="warning-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
+            <div id="warning-modal-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
+            <div id="warning-modal-panel" class="relative bg-white rounded-xl shadow-modal p-6 max-w-sm w-full transform transition-all scale-95 opacity-0 border border-slate-200">
+                <div class="flex flex-col items-center text-center">
+                    <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2">알림</h3>
+                    <p id="warning-modal-message" class="text-slate-500 text-sm mb-6"></p>
+                    <button id="warning-modal-close" class="w-full bg-slate-900 text-white py-2.5 rounded-lg font-bold hover:bg-slate-800 transition-colors text-sm">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solution Modal (Add/Edit Solution) -->
+        <div id="solution-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
+            <div id="solution-modal-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
+            <div id="solution-modal-panel" class="relative bg-white rounded-2xl shadow-modal w-full max-w-lg transform transition-all scale-95 opacity-0 border border-slate-200 flex flex-col max-h-[90vh]">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h3 id="solution-modal-title" class="text-lg font-bold text-slate-900">솔루션 추가</h3>
+                    <button id="solution-modal-close-top" class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('solution-modal-cancel').click()">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">제조사 (Manufacturer)</label>
+                            <input type="text" id="sol-manufacturer" class="input-enterprise w-full" placeholder="예: Atlassian">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">제품명 (Product Name)</label>
+                            <input type="text" id="sol-name" class="input-enterprise w-full" placeholder="예: Jira Service Management">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-bold text-slate-500 ml-1">시장 점유율 (Share)</label>
+                            <span id="sol-share-disp" class="text-sm font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">10%</span>
+                        </div>
+                        <input type="range" id="sol-share" min="1" max="100" value="10" class="slider-enterprise w-full" oninput="document.getElementById('sol-share-disp').innerText = this.value + '%'">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-bold text-slate-500 ml-1">Pain Points (AI 분석)</label>
+                            <button id="btn-analyze-painpoints" class="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100 hover:bg-indigo-100 transition-all">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI 분석 실행
+                            </button>
+                        </div>
+                        <div id="painpoint-loading" class="hidden flex items-center justify-center py-4">
+                            <i class="fa-solid fa-spinner fa-spin text-indigo-500 mr-2"></i>
+                            <span class="text-xs text-slate-400">솔루션 약점 분석 중...</span>
+                        </div>
+                        <div id="painpoint-list" class="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                            <!-- Pain points will be rendered here -->
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1.5 ml-1">추가 메모 (Note)</label>
+                        <textarea id="sol-note" class="input-enterprise w-full min-h-[80px] text-sm resize-none" placeholder="비고 및 특이사항"></textarea>
+                    </div>
+                </div>
+                <div class="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                    <button id="solution-modal-cancel" class="px-5 py-2 text-slate-500 font-bold text-sm hover:bg-slate-200 rounded-xl transition-all">취소</button>
+                    <button id="solution-modal-save" class="px-6 py-2 bg-slate-900 text-white font-bold text-sm rounded-xl shadow-lg hover:bg-indigo-600 transition-all">저장하기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solution Detail Modal -->
+        <div id="solution-detail-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
+            <div id="detail-modal-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
+            <div id="detail-modal-panel" class="relative bg-slate-900 rounded-2xl shadow-modal w-full max-w-md transform transition-all scale-95 opacity-0 border border-white/10 flex flex-col">
+                <div class="p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="overflow-hidden mr-4">
+                            <div id="detail-manufacturer" class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Manufacturer</div>
+                            <h3 id="detail-name" class="text-2xl font-black text-white leading-tight truncate">Solution Name</h3>
+                        </div>
+                        <div class="flex flex-col items-end shrink-0">
+                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Market Share</span>
+                            <span id="detail-share" class="text-2xl font-black text-white leading-none">0%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Key Pain Points</h4>
+                            <ul id="detail-painpoints" class="space-y-2">
+                                <!-- Pain points list -->
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-white/5 pb-2">Technical Note</h4>
+                            <p id="detail-note" class="text-sm text-slate-300 leading-relaxed italic"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 bg-black/20 rounded-b-2xl border-t border-white/5">
+                    <button id="detail-modal-close" class="w-full py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all">닫기</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Problem Definition / Report Editor Modal -->
         <div id="problem-def-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
             <div id="problem-def-backdrop" class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity opacity-0"></div>
