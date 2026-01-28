@@ -169,12 +169,17 @@ function validateStageTransition(deal) {
         if (!d) return { inputs: false, insight: false };
         return { inputs: !!(d.behavior && d.emotion && d.touchpoint && d.problem), insight: !!d.result };
     };
-    const disc = checkDisc(stage);
+    
+    const hasReportType = (type) => {
+        return deal.reports && deal.reports.some(r => r.type === type);
+    };
 
+    const disc = checkDisc(stage);
     const discoveryCheckLabel = 'Discovery & Insight 완료';
 
     if (stage === 'awareness') {
         checks.push({ label: discoveryCheckLabel, valid: disc.inputs && disc.insight });
+        checks.push({ label: '문제 정의서 생성 완료', valid: hasReportType('problem_definition') });
     } else if (stage === 'consideration') {
         checks.push({ label: discoveryCheckLabel, valid: disc.insight });
         const qual = deal.assessment.consideration;
@@ -182,13 +187,16 @@ function validateStageTransition(deal) {
         checks.push({ label: 'Deal Qualification 완료', valid: isQualDone });
         const hasMap = Object.keys(deal.solutionMapContent || {}).length > 0;
         checks.push({ label: 'Solution Map 수립', valid: hasMap });
+        checks.push({ label: '검토 기준 정의서 생성 완료', valid: hasReportType('decision_preconditions') });
     } else if (stage === 'evaluation') {
         checks.push({ label: discoveryCheckLabel, valid: disc.insight });
         checks.push({ label: 'Competitive Fit 완료', valid: !!(deal.competitive && deal.competitive.result) });
         checks.push({ label: 'Tech. Win Strategy 완료', valid: !!deal.twsReport });
+        checks.push({ label: '평가 기준 정의서 생성 완료', valid: hasReportType('decision_criteria') });
     } else if (stage === 'purchase') {
         checks.push({ label: discoveryCheckLabel, valid: disc.insight });
         checks.push({ label: 'Deal Win Strategy 완료', valid: !!deal.dwsReport });
+        checks.push({ label: '프로젝트 성공 가이드 생성 완료', valid: hasReportType('success_guide') });
     }
     return { canMove: checks.length > 0 && checks.every(c => c.valid), checks };
 }
