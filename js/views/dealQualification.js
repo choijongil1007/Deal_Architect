@@ -19,12 +19,14 @@ export async function renderDealQualification(container, dealId, stageId = 'awar
     const isClosed = deal.status === 'won' || deal.status === 'lost';
     let isReadOnly = stageId !== 'consideration' || isClosed;
 
-    if (!deal.assessment[effectiveStageId]) {
+    // 수정: 객체 존재 여부뿐만 아니라 내부 biz 속성이 있는지까지 체크하여 불완전한 초기화 방지
+    if (!deal.assessment[effectiveStageId] || !deal.assessment[effectiveStageId].biz) {
         deal.assessment[effectiveStageId] = {
+            ...deal.assessment[effectiveStageId], // 기존 속성(isCompleted 등) 유지
             biz: { scores: {}, weights: { budget: 20, authority: 25, need: 35, timeline: 20 } },
             tech: { scores: {}, weights: { req: 30, arch: 25, data: 25, ops: 20 } },
             aiRecommendations: {}, 
-            isCompleted: false
+            isCompleted: deal.assessment[effectiveStageId]?.isCompleted || false
         };
         await Store.saveDeal(deal);
     }
