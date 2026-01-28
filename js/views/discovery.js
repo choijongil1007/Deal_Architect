@@ -1,4 +1,3 @@
-
 import { Store } from '../store.js';
 import { callGemini } from '../api.js';
 import { showToast, setButtonLoading, cleanJSONString } from '../utils.js';
@@ -181,7 +180,7 @@ function renderResult(result, isStale, stageId) {
         extraActionHtml = `
             <div class="mt-8 pt-6 border-t border-slate-100 flex justify-center">
                 <button class="btn-gen-decision-crit bg-slate-900 hover:bg-indigo-600 shadow-md active:scale-95 text-white px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 justify-center min-w-[200px]">
-                    <i class="fa-solid fa-wand-magic-sparkles text-yellow-300 text-xs"></i> 판단 기준 정의서 생성
+                    <i class="fa-solid fa-wand-magic-sparkles text-yellow-300 text-xs"></i> 평가 기준 정의서 생성
                 </button>
             </div>
         `;
@@ -842,7 +841,7 @@ function openReportEditor(content, dealId, reportType, isJson = false) {
         let reportTitle = "보고서";
         if (reportType === 'problem_definition') reportTitle = "문제 정의서";
         else if (reportType === 'decision_preconditions') reportTitle = "검토 기준 정의서";
-        else if (reportType === 'decision_criteria') reportTitle = "판단 기준 정의서";
+        else if (reportType === 'decision_criteria') reportTitle = "평가 기준 정의서";
         else if (reportType === 'success_guide') reportTitle = "프로젝트 성공 가이드";
         
         renderPreview();
