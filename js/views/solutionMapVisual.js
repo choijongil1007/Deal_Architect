@@ -1,5 +1,5 @@
 import { Store } from '../store.js';
-import { showSolutionDetailModal } from '../utils.js';
+import { showSolutionDetailModal, showConfirmModal, showToast } from '../utils.js';
 
 const CONFIG = {
     domain: { headerHeight: 0 },
@@ -16,7 +16,7 @@ export async function initTreemap(containerId, dealId) {
 
     const renderCurrent = async () => {
         const content = await Store.getMapContent(dealId);
-        render(container, content);
+        render(container, content, dealId, renderCurrent);
     };
 
     await renderCurrent();
@@ -34,7 +34,7 @@ export async function initTreemap(containerId, dealId) {
     return renderCurrent;
 }
 
-function render(container, data) {
+function render(container, data, dealId, refreshCallback) {
     if (!container) return;
     const containerWidth = container.clientWidth;
     if (containerWidth === 0) return;
@@ -52,11 +52,34 @@ function render(container, data) {
 
     domainEntries.forEach(([domainName, categories]) => {
         const section = document.createElement('div');
-        section.className = "w-full mb-12 border-b border-slate-100 pb-12 last:border-0 last:pb-0";
+        section.className = "w-full mb-12 border-b border-slate-100 pb-12 last:border-0 last:pb-0 group/domain-section";
+        
+        // 대분류 헤더 영역 (제목 + 삭제 버튼)
+        const header = document.createElement('div');
+        header.className = "flex justify-between items-center mb-6 pl-4 border-l-4 border-slate-900";
+        
         const title = document.createElement('h3');
-        title.className = "text-xl font-bold text-slate-800 mb-6 pl-4 border-l-4 border-slate-900";
+        title.className = "text-xl font-bold text-slate-800";
         title.textContent = domainName;
-        section.appendChild(title);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = "p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover/domain-section:opacity-100";
+        deleteBtn.innerHTML = `<i class="fa-solid fa-trash-can text-sm"></i>`;
+        deleteBtn.title = "대분류 삭제";
+        deleteBtn.onclick = () => {
+            showConfirmModal(`'${domainName}' 대분류와 하위 데이터를 모두 삭제하시겠습니까?`, async () => {
+                const success = await Store.deleteDomain(dealId, domainName);
+                if (success) {
+                    showToast(`'${domainName}'가 삭제되었습니다.`, "success");
+                    if (refreshCallback) await refreshCallback();
+                }
+            });
+        };
+
+        header.appendChild(title);
+        header.appendChild(deleteBtn);
+        section.appendChild(header);
+
         let solutionCount = 0;
         Object.values(categories).forEach(sols => {
             solutionCount += sols.length;
@@ -88,7 +111,7 @@ function render(container, data) {
             const ppSection = document.createElement('div');
             ppSection.className = "mt-8";
             const ppHeader = document.createElement('h3');
-            ppHeader.className = "text-xl font-bold text-slate-800 mb-6 pl-4 border-l-4 border-slate-900";
+            ppHeader.className = "text-lg font-bold text-slate-800 mb-6 pl-4 border-l-4 border-slate-400";
             ppHeader.textContent = "주요 고객 불만사항 (Key Pain Points)";
             ppSection.appendChild(ppHeader);
             const grid = document.createElement('div');
