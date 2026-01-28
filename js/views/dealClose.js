@@ -1,4 +1,3 @@
-
 import { Store } from '../store.js';
 import { callGemini } from '../api.js';
 import { showToast, setButtonLoading, showConfirmModal } from '../utils.js';
@@ -73,7 +72,7 @@ async function renderModalContent(container) {
                     </div>
 
                     <!-- AI Factor Analysis -->
-                    <div id="factors-section" class="hidden">
+                    <div id="factors-section" class="hidden animate-modal-in">
                         <div class="flex justify-between items-center mb-4">
                             <label class="block text-xs font-black text-slate-400 uppercase tracking-widest" id="factors-label">2. 주요 요인 분석</label>
                             <button id="btn-analyze-factors" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-2">
@@ -116,14 +115,110 @@ function attachEvents(deal) {
     const closeBtn = document.getElementById('deal-close-cancel');
     const cancelBtn = document.getElementById('btn-cancel-close');
     const saveBtn = document.getElementById('btn-save-close');
+    const radioInputs = document.querySelectorAll('input[name="closeType"]');
+    const factorsSection = document.getElementById('factors-section');
+    const factorsLabel = document.getElementById('factors-label');
+    const btnAnalyze = document.getElementById('btn-analyze-factors');
+    const factorsList = document.getElementById('factors-list');
+    const lessonsLearned = document.getElementById('lessons-learned');
+    const otherFactor = document.getElementById('other-factor');
     const panel = modal.querySelector('.transform');
     
     const closeModal = () => {
         if (modal) {
             backdrop.classList.add('opacity-0');
             panel.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 300);
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                currentDealId = null;
+            }, 300);
         }
     };
-    // ... rest of event logic ...
+
+    // 닫기/취소 이벤트 연결
+    closeBtn.onclick = closeModal;
+    cancelBtn.onclick = closeModal;
+    backdrop.onclick = closeModal;
+
+    // 라디오 버튼 변경 시 처리
+    radioInputs.forEach(input => {
+        input.onchange = () => {
+            saveBtn.disabled = false;
+            factorsSection.classList.remove('hidden');
+            const type = input.value === 'won' ? 'Win' : 'Loss';
+            factorsLabel.innerText = `2. 주요 ${type} 요인 분석`;
+            factorsList.innerHTML = `<p class="text-xs text-slate-500 text-center italic">분석 버튼을 눌러 ${type} 요인을 도출하세요.</p>`;
+        };
+    });
+
+    // AI 요인 분석 실행
+    btnAnalyze.onclick = async () => {
+        const selectedType = document.querySelector('input[name="closeType"]:checked')?.value;
+        if (!selectedType) return;
+
+        setButtonLoading(btnAnalyze, true, "분석 중...");
+        factorsList.innerHTML = `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-spinner fa-spin text-indigo-400 mb-2"></i><p class="text-[10px] text-slate-500 uppercase tracking-widest font-black">고객 신호 분석 중</p></div>`;
+
+        try {
+            const prompt = `Role: Senior Sales Strategy Analyst. 
+Context: A deal has been closed as "${selectedType.toUpperCase()}".
+Deal Context: Client is "${deal.clientName}", Solution is "${deal.solution}".
+Recent Discovery Signals:
+- Awareness Problem: ${deal.discovery.awareness?.problem || 'N/A'}
+- Purchase JTBD: ${deal.discovery.purchase?.result?.jtbd || 'N/A'}
+
+Objective: Based on the deal history and final status, provide 5 specific business factors (Win factors if Won, Loss factors if Lost) that likely led to this outcome.
+Language: Korean. 
+Format: Return JSON object with a single property "factors" which is an array of 5 strings. 
+Example: { "factors": ["합리적인 TCO 증명", "의사결정권자의 강력한 지지", ...] }`;
+
+            const result = await callGemini(prompt);
+            const factors = (result && result.factors) ? result.factors : [];
+
+            if (factors.length > 0) {
+                factorsList.innerHTML = factors.map((f, i) => `
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/5 cursor-pointer transition-colors group">
+                        <input type="checkbox" class="factor-checkbox mt-1 rounded border-white/20 bg-slate-800 text-indigo-600 focus:ring-indigo-500" value="${f}">
+                        <span class="text-sm text-slate-300 group-hover:text-white transition-colors">${f}</span>
+                    </label>
+                `).join('');
+            } else {
+                factorsList.innerHTML = `<p class="text-xs text-rose-400 text-center">요인을 분석할 수 없습니다. 직접 입력해주세요.</p>`;
+            }
+        } catch (e) {
+            factorsList.innerHTML = `<p class="text-xs text-rose-400 text-center">${e.message}</p>`;
+        } finally {
+            setButtonLoading(btnAnalyze, false);
+        }
+    };
+
+    // 저장 처리
+    saveBtn.onclick = async () => {
+        const type = document.querySelector('input[name="closeType"]:checked')?.value;
+        const selectedFactors = Array.from(document.querySelectorAll('.factor-checkbox:checked')).map(cb => cb.value);
+        if (otherFactor.value.trim()) selectedFactors.push(otherFactor.value.trim());
+
+        showConfirmModal(`이 딜을 ${type.toUpperCase()} 처리하시겠습니까? 종료된 딜은 수정이 제한됩니다.`, async () => {
+            setButtonLoading(saveBtn, true, "종료 처리 중...");
+            try {
+                const refreshedDeal = await Store.getDeal(currentDealId);
+                refreshedDeal.status = type;
+                refreshedDeal.closeMetadata = {
+                    type: type,
+                    factors: selectedFactors,
+                    lessonsLearned: lessonsLearned.value.trim(),
+                    closedAt: new Date().toISOString()
+                };
+                
+                await Store.saveDeal(refreshedDeal);
+                showToast(`딜이 성공적으로 종료(${type.toUpperCase()})되었습니다.`, "success");
+                closeModal();
+                if (onCloseCallback) onCloseCallback();
+            } catch (e) {
+                showToast("저장 실패: " + e.message, "error");
+            } finally {
+                setButtonLoading(saveBtn, false);
+            }
+        });
+    };
 }
