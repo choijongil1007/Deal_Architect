@@ -1,4 +1,3 @@
-
 import { Store } from '../store.js';
 import { callGemini } from '../api.js';
 import { showToast, showConfirmModal, generateId } from '../utils.js';
@@ -177,6 +176,12 @@ function attachDWSEvents(deal) {
     
     if (addRiskBtn) addRiskBtn.onclick = () => {
         const modal = document.getElementById('risk-modal');
+        // 담당자 필드에 딜의 내부 담당자 자동 입력
+        const ownerInput = document.getElementById('risk-owner');
+        if (ownerInput) {
+            ownerInput.value = deal.internalContact || '';
+        }
+        
         modal.classList.remove('hidden');
         requestAnimationFrame(() => {
             document.getElementById('risk-modal-backdrop').classList.remove('opacity-0');
