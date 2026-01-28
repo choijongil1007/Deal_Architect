@@ -1,6 +1,5 @@
-
 import { Store } from '../store.js';
-import { showWarningModal, showConfirmModal } from '../utils.js';
+import { showWarningModal, showConfirmModal, showToast } from '../utils.js';
 import { callGemini } from '../api.js';
 
 const expandedState = new Set();
@@ -26,12 +25,15 @@ export async function initTreeBuilder(elementId, dealId, onUpdate) {
     currentDealId = dealId;
     refreshCallback = onUpdate;
     if (!container) return;
+    
+    // 중복 방지를 위한 이벤트 리스너 리셋
     const addDomainBtn = document.getElementById('btn-add-domain');
     if (addDomainBtn) {
         const newBtn = addDomainBtn.cloneNode(true);
         addDomainBtn.parentNode.replaceChild(newBtn, addDomainBtn);
         newBtn.addEventListener('click', () => showAddDomainInput());
     }
+    
     setupSolutionModal();
     await render();
     return render;
@@ -42,67 +44,123 @@ async function render() {
     const data = await Store.getMapContent(currentDealId);
     const scrollTop = container.scrollTop;
     container.innerHTML = '';
+    
     const domainKeys = Object.keys(data || {});
     let hasValidDomains = false;
+
     domainKeys.forEach(domainName => {
         const categories = data[domainName];
         if (!categories || typeof categories !== 'object' || Array.isArray(categories)) return;
+        
         hasValidDomains = true;
         const isExpanded = expandedState.has(`d-${domainName}`);
+        
         const domainEl = document.createElement('div');
-        domainEl.className = "bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-all mb-3 hover:shadow-md";
+        domainEl.className = "bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-all mb-3 hover:shadow-md group";
         domainEl.dataset.domainName = domainName;
+
         const header = document.createElement('div');
         header.className = `p-3 flex items-center justify-between cursor-pointer select-none transition-colors ${isExpanded ? 'bg-slate-50 border-b border-slate-100' : 'bg-white hover:bg-slate-50'}`;
+        
         const titleArea = document.createElement('div');
         titleArea.className = "flex items-center gap-2 flex-1";
-        titleArea.innerHTML = `<span class="p-1 rounded-md hover:bg-slate-200 transition-colors">${isExpanded ? ICONS.chevronDown : ICONS.chevronRight}</span><span class="font-bold text-slate-800 text-sm tracking-tight domain-title-text">${escapeHtml(domainName)}</span>`;
+        titleArea.innerHTML = `
+            <span class="p-1 rounded-md hover:bg-slate-200 transition-colors">${isExpanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
+            <span class="font-bold text-slate-800 text-sm tracking-tight domain-title-text">${escapeHtml(domainName)}</span>
+        `;
         titleArea.addEventListener('click', () => toggleExpand(`d-${domainName}`));
+
         const actionsArea = document.createElement('div');
-        actionsArea.className = "flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity";
-        const btnAdd = createActionButton(ICONS.plus, 'text-slate-600', '중분류 추가');
+        actionsArea.className = "flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity";
+        
+        const btnAdd = createActionButton(ICONS.plus, 'text-slate-600 hover:bg-slate-200', '중분류 추가');
         btnAdd.onclick = (e) => { e.stopPropagation(); showAddCategoryInput(domainName); };
-        const btnEdit = createActionButton(ICONS.edit, 'text-blue-600', '이름 수정');
+        
+        const btnEdit = createActionButton(ICONS.edit, 'text-blue-600 hover:bg-blue-50', '이름 수정');
         btnEdit.onclick = (e) => { e.stopPropagation(); showEditDomainInput(domainName, header); };
-        const btnDel = createActionButton(ICONS.trash, 'text-red-500', '삭제');
-        btnDel.onclick = (e) => { e.stopPropagation(); deleteDomain(domainName); };
-        actionsArea.append(btnAdd, btnEdit, btnDel); header.appendChild(titleArea); header.appendChild(actionsArea); header.classList.add('group'); domainEl.appendChild(header);
+        
+        const btnDel = createActionButton(ICONS.trash, 'text-red-500 hover:bg-red-50', '대분류 삭제');
+        btnDel.onclick = (e) => { 
+            e.stopPropagation(); 
+            deleteDomain(domainName); 
+        };
+
+        actionsArea.append(btnAdd, btnEdit, btnDel);
+        header.appendChild(titleArea);
+        header.appendChild(actionsArea);
+        domainEl.appendChild(header);
+
         if (isExpanded) {
             const catContainer = document.createElement('div');
-            catContainer.className = "p-2 bg-slate-50/30 space-y-1.5"; catContainer.dataset.domainContent = domainName;
+            catContainer.className = "p-2 bg-slate-50/30 space-y-1.5";
+            catContainer.dataset.domainContent = domainName;
+
             Object.keys(categories).forEach(catName => {
-                const solutions = categories[catName]; const isCatExpanded = expandedState.has(`c-${domainName}-${catName}`);
+                const solutions = categories[catName];
+                const isCatExpanded = expandedState.has(`c-${domainName}-${catName}`);
+                
                 const catEl = document.createElement('div');
-                catEl.className = "rounded-lg border border-transparent hover:border-slate-200 hover:bg-white transition-all"; catEl.dataset.catName = catName;
+                catEl.className = "rounded-lg border border-transparent hover:border-slate-200 hover:bg-white transition-all group/cat";
+                catEl.dataset.catName = catName;
+
                 const catHeader = document.createElement('div');
-                catHeader.className = "flex items-center justify-between py-1.5 px-2 group/cat cursor-pointer select-none";
+                catHeader.className = "flex items-center justify-between py-1.5 px-2 cursor-pointer select-none";
+                
                 const catTitleArea = document.createElement('div');
                 catTitleArea.className = "flex items-center gap-2 flex-1 pl-1";
-                catTitleArea.innerHTML = `<span class="text-slate-400 scale-90">${isCatExpanded ? ICONS.chevronDown : ICONS.chevronRight}</span><span class="text-sm font-semibold text-slate-700 cat-title-text">${escapeHtml(catName)}</span>`;
+                catTitleArea.innerHTML = `
+                    <span class="text-slate-400 scale-90">${isCatExpanded ? ICONS.chevronDown : ICONS.chevronRight}</span>
+                    <span class="text-sm font-semibold text-slate-700 cat-title-text">${escapeHtml(catName)}</span>
+                `;
                 catTitleArea.addEventListener('click', () => toggleExpand(`c-${domainName}-${catName}`));
+
                 const catActions = document.createElement('div');
-                catActions.className = "flex items-center gap-1 opacity-0 group-hover/cat:opacity-100 transition-opacity";
-                const cBtnAdd = createActionButton(ICONS.plus, 'text-slate-500', '솔루션 추가');
+                catActions.className = "flex items-center gap-1 opacity-100 md:opacity-0 group-hover/cat:opacity-100 transition-opacity";
+                
+                const cBtnAdd = createActionButton(ICONS.plus, 'text-slate-500 hover:bg-slate-100', '솔루션 추가');
                 cBtnAdd.onclick = (e) => { e.stopPropagation(); openSolutionModal(domainName, catName); };
-                const cBtnEdit = createActionButton(ICONS.edit, 'text-blue-500', '이름 수정');
+                
+                const cBtnEdit = createActionButton(ICONS.edit, 'text-blue-500 hover:bg-blue-50', '이름 수정');
                 cBtnEdit.onclick = (e) => { e.stopPropagation(); showEditCategoryInput(domainName, catName, catHeader); };
-                const cBtnDel = createActionButton(ICONS.trash, 'text-red-500', '삭제');
+                
+                const cBtnDel = createActionButton(ICONS.trash, 'text-red-500 hover:bg-red-50', '중분류 삭제');
                 cBtnDel.onclick = (e) => { e.stopPropagation(); deleteCategory(domainName, catName); };
-                catActions.append(cBtnAdd, cBtnEdit, cBtnDel); catHeader.appendChild(catTitleArea); catHeader.appendChild(catActions); catEl.appendChild(catHeader);
+
+                catActions.append(cBtnAdd, cBtnEdit, cBtnDel);
+                catHeader.appendChild(catTitleArea);
+                catHeader.appendChild(catActions);
+                catEl.appendChild(catHeader);
+
                 if (isCatExpanded) {
                     const solContainer = document.createElement('div');
-                    solContainer.className = "pl-8 pr-1 pb-2 space-y-1"; solContainer.dataset.solutionContent = `${domainName}-${catName}`;
+                    solContainer.className = "pl-8 pr-1 pb-2 space-y-1";
+                    solContainer.dataset.solutionContent = `${domainName}-${catName}`;
+
                     solutions.forEach((sol, idx) => {
                         const solEl = document.createElement('div');
                         solEl.className = "flex items-center justify-between group/sol py-2 px-3 bg-white border border-slate-100 rounded-lg shadow-sm hover:border-blue-300 transition-colors";
+                        
                         const solContent = document.createElement('div');
                         solContent.className = "flex items-center gap-2 text-sm text-slate-600 w-full overflow-hidden mr-2";
-                        solContent.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span><span class="truncate font-medium text-slate-700">${escapeHtml(sol.name)}</span><span class="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono shrink-0 ml-auto border border-slate-200">${sol.share}%</span>`;
+                        solContent.innerHTML = `
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                            <span class="truncate font-medium text-slate-700">${escapeHtml(sol.name)}</span>
+                            <span class="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono shrink-0 ml-auto border border-slate-200">${sol.share}%</span>
+                        `;
+
                         const solActions = document.createElement('div');
-                        solActions.className = "flex items-center opacity-0 group-hover/sol:opacity-100 transition-opacity shrink-0";
-                        const sBtnEdit = createActionButton(ICONS.edit, 'text-blue-400', '수정'); sBtnEdit.onclick = () => openSolutionModal(domainName, catName, sol, idx);
-                        const sBtnDel = createActionButton(ICONS.trash, 'text-red-400', '삭제'); sBtnDel.onclick = () => deleteSolution(domainName, catName, idx);
-                        solActions.append(sBtnEdit, sBtnDel); solEl.appendChild(solContent); solEl.appendChild(solActions); solContainer.appendChild(solEl);
+                        solActions.className = "flex items-center opacity-100 md:opacity-0 group-hover/sol:opacity-100 transition-opacity shrink-0";
+                        
+                        const sBtnEdit = createActionButton(ICONS.edit, 'text-blue-400 hover:bg-blue-50', '수정');
+                        sBtnEdit.onclick = () => openSolutionModal(domainName, catName, sol, idx);
+                        
+                        const sBtnDel = createActionButton(ICONS.trash, 'text-red-400 hover:bg-red-50', '삭제');
+                        sBtnDel.onclick = () => deleteSolution(domainName, catName, idx);
+
+                        solActions.append(sBtnEdit, sBtnDel);
+                        solEl.appendChild(solContent);
+                        solEl.appendChild(solActions);
+                        solContainer.appendChild(solEl);
                     });
                     catEl.appendChild(solContainer);
                 }
@@ -112,9 +170,17 @@ async function render() {
         }
         container.appendChild(domainEl);
     });
+
     if (!hasValidDomains) {
         if (document.querySelectorAll('.temp-input-row').length === 0) {
-             container.innerHTML = `<div id="empty-msg" class="flex flex-col items-center justify-center h-48 text-slate-400"><p class="text-sm font-medium">데이터가 없습니다</p><p class="text-xs mt-1 text-slate-400">'대분류 추가' 버튼을 눌러 시작하세요.</p></div>`;
+             container.innerHTML = `
+                <div id="empty-msg" class="flex flex-col items-center justify-center h-48 text-slate-400">
+                    <div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100 opacity-50">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <p class="text-sm font-medium">구성된 대분류가 없습니다</p>
+                    <p class="text-[11px] mt-1 text-slate-400 tracking-tight">'대분류 추가' 버튼을 눌러 아키텍처를 구성하세요.</p>
+                </div>`;
         }
     }
     container.scrollTop = scrollTop;
@@ -126,7 +192,6 @@ function setupSolutionModal() {
     const analyzeBtn = document.getElementById('btn-analyze-painpoints');
     const backdrop = document.getElementById('solution-modal-backdrop');
     
-    // 엔터 키 핸들링 추가
     const manufacturerInput = document.getElementById('sol-manufacturer');
     const nameInput = document.getElementById('sol-name');
     
@@ -140,120 +205,332 @@ function setupSolutionModal() {
     manufacturerInput.addEventListener('keydown', handleEnter);
     nameInput.addEventListener('keydown', handleEnter);
 
-    const newCancel = cancelBtn.cloneNode(true); cancelBtn.parentNode.replaceChild(newCancel, cancelBtn); newCancel.addEventListener('click', closeSolutionModal);
-    const newBackdrop = backdrop.cloneNode(true); backdrop.parentNode.replaceChild(newBackdrop, backdrop); newBackdrop.addEventListener('click', closeSolutionModal);
-    const newSave = saveBtn.cloneNode(true); saveBtn.parentNode.replaceChild(newSave, saveBtn); newSave.addEventListener('click', saveSolutionFromModal);
-    const newAnalyze = analyzeBtn.cloneNode(true); analyzeBtn.parentNode.replaceChild(newAnalyze, analyzeBtn); newAnalyze.addEventListener('click', fetchPainPoints);
+    const newCancel = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    newCancel.addEventListener('click', closeSolutionModal);
+
+    const newBackdrop = backdrop.cloneNode(true);
+    backdrop.parentNode.replaceChild(newBackdrop, backdrop);
+    newBackdrop.addEventListener('click', closeSolutionModal);
+
+    const newSave = saveBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newSave, saveBtn);
+    newSave.addEventListener('click', saveSolutionFromModal);
+
+    const newAnalyze = analyzeBtn.cloneNode(true);
+    analyzeBtn.parentNode.replaceChild(newAnalyze, analyzeBtn);
+    newAnalyze.addEventListener('click', fetchPainPoints);
 }
 
 function openSolutionModal(domainName, categoryName, existingSolution = null, index = null) {
-    currentDomainForModal = domainName; currentCategoryForModal = categoryName; currentSolutionIndexForModal = index;
-    const modal = document.getElementById('solution-modal'), backdrop = document.getElementById('solution-modal-backdrop'), panel = document.getElementById('solution-modal-panel'), title = document.getElementById('solution-modal-title'), analyzeBtn = document.getElementById('btn-analyze-painpoints');
-    const mInput = document.getElementById('sol-manufacturer'), nInput = document.getElementById('sol-name'), sInput = document.getElementById('sol-share'), noteInput = document.getElementById('sol-note'), listContainer = document.getElementById('painpoint-list'), shareDisp = document.getElementById('sol-share-disp');
-    mInput.value = ''; nInput.value = ''; sInput.value = '10'; shareDisp.innerText = '10%'; noteInput.value = ''; listContainer.innerHTML = '<p class="text-xs text-gray-500 text-center py-4">제조사와 제품명을 입력 후 \'AI 분석\' 버튼을 눌러주세요.</p>';
-    analyzeBtn.disabled = false; analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50'); analyzeBtn.classList.add('bg-indigo-50', 'hover:bg-indigo-100');
+    currentDomainForModal = domainName;
+    currentCategoryForModal = categoryName;
+    currentSolutionIndexForModal = index;
+
+    const modal = document.getElementById('solution-modal'),
+          backdrop = document.getElementById('solution-modal-backdrop'),
+          panel = document.getElementById('solution-modal-panel'),
+          title = document.getElementById('solution-modal-title'),
+          analyzeBtn = document.getElementById('btn-analyze-painpoints');
+          
+    const mInput = document.getElementById('sol-manufacturer'),
+          nInput = document.getElementById('sol-name'),
+          sInput = document.getElementById('sol-share'),
+          noteInput = document.getElementById('sol-note'),
+          listContainer = document.getElementById('painpoint-list'),
+          shareDisp = document.getElementById('sol-share-disp');
+
+    mInput.value = ''; nInput.value = ''; sInput.value = '10'; shareDisp.innerText = '10%'; noteInput.value = '';
+    listContainer.innerHTML = '<p class="text-xs text-gray-500 text-center py-4">제조사와 제품명을 입력 후 \'AI 분석\' 버튼을 눌러주세요.</p>';
+    
+    analyzeBtn.disabled = false;
+    analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50');
+    analyzeBtn.classList.add('bg-indigo-50', 'hover:bg-indigo-100');
+
     if (existingSolution) {
-        title.textContent = '솔루션 수정'; mInput.value = existingSolution.manufacturer || ''; nInput.value = existingSolution.name || ''; sInput.value = existingSolution.share || 10; shareDisp.innerText = sInput.value + '%'; noteInput.value = existingSolution.note || '';
-        if (existingSolution.painPoints && existingSolution.painPoints.length > 0) { renderPainPoints(existingSolution.painPoints, true); analyzeBtn.disabled = true; analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50'); }
-    } else { title.textContent = '솔루션 추가'; }
-    modal.classList.remove('hidden'); requestAnimationFrame(() => { backdrop.classList.remove('opacity-0'); panel.classList.remove('opacity-0', 'scale-95'); panel.classList.add('opacity-100', 'scale-100'); });
+        title.textContent = '솔루션 수정';
+        mInput.value = existingSolution.manufacturer || '';
+        nInput.value = existingSolution.name || '';
+        sInput.value = existingSolution.share || 10;
+        shareDisp.innerText = sInput.value + '%';
+        noteInput.value = existingSolution.note || '';
+        
+        if (existingSolution.painPoints && existingSolution.painPoints.length > 0) {
+            renderPainPoints(existingSolution.painPoints, true);
+            analyzeBtn.disabled = true;
+            analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50');
+        }
+    } else {
+        title.textContent = '솔루션 추가';
+    }
+
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        backdrop.classList.remove('opacity-0');
+        panel.classList.remove('opacity-0', 'scale-95');
+        panel.classList.add('opacity-100', 'scale-100');
+    });
     if(!existingSolution) mInput.focus();
 }
 
 function closeSolutionModal() {
-    const modal = document.getElementById('solution-modal'), backdrop = document.getElementById('solution-modal-backdrop'), panel = document.getElementById('solution-modal-panel');
-    backdrop.classList.add('opacity-0'); panel.classList.remove('opacity-100', 'scale-100'); panel.classList.add('opacity-0', 'scale-95');
+    const modal = document.getElementById('solution-modal'),
+          backdrop = document.getElementById('solution-modal-backdrop'),
+          panel = document.getElementById('solution-modal-panel');
+    backdrop.classList.add('opacity-0');
+    panel.classList.remove('opacity-100', 'scale-100');
+    panel.classList.add('opacity-0', 'scale-95');
     setTimeout(() => modal.classList.add('hidden'), 200);
 }
 
 async function fetchPainPoints() {
-    const m = document.getElementById('sol-manufacturer').value.trim(), p = document.getElementById('sol-name').value.trim(), l = document.getElementById('painpoint-list'), loader = document.getElementById('painpoint-loading'), btn = document.getElementById('btn-analyze-painpoints');
+    const m = document.getElementById('sol-manufacturer').value.trim(),
+          p = document.getElementById('sol-name').value.trim(),
+          l = document.getElementById('painpoint-list'),
+          loader = document.getElementById('painpoint-loading'),
+          btn = document.getElementById('btn-analyze-painpoints');
+
     if (!m || !p) { showWarningModal("제조사와 제품명을 모두 입력해주세요."); return; }
     if (btn.disabled) return;
-    l.innerHTML = ''; loader.classList.remove('hidden');
+    
+    l.innerHTML = '';
+    loader.classList.remove('hidden');
     try {
         const prompt = `List 5 to 8 common customer pain points for the software product "${m} ${p}" in Korean. Provide the answer as a plain text list, one item per line. Do not use numbering or markdown.`;
         const resultRaw = await callGemini(prompt);
         let rawContent = typeof resultRaw === 'string' ? resultRaw : (resultRaw.content || resultRaw.text || JSON.stringify(resultRaw));
         const pts = rawContent.split('\n').map(li => li.trim()).filter(li => li.length > 0).map(li => li.replace(/^[-*•\d\.]+\s*/, ''));
-        if (pts.length === 0) l.innerHTML = '<p class="text-xs text-red-400 text-center py-4">결과를 가져올 수 없습니다.</p>';
-        else { renderPainPoints(pts, false); btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50'); }
-    } catch (e) { l.innerHTML = `<div class="p-4 bg-red-50 text-red-500 text-xs">${e.message}</div>`; }
-    finally { loader.classList.add('hidden'); }
+        
+        if (pts.length === 0) {
+            l.innerHTML = '<p class="text-xs text-red-400 text-center py-4">결과를 가져올 수 없습니다.</p>';
+        } else {
+            renderPainPoints(pts, false);
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-indigo-50/50');
+        }
+    } catch (e) {
+        l.innerHTML = `<div class="p-4 bg-red-50 text-red-500 text-xs">${e.message}</div>`;
+    } finally {
+        loader.classList.add('hidden');
+    }
 }
 
 function renderPainPoints(points, preChecked = false) {
-    const l = document.getElementById('painpoint-list'); l.innerHTML = '';
+    const l = document.getElementById('painpoint-list');
+    l.innerHTML = '';
     points.forEach((point) => {
         const div = document.createElement('div');
         const isSelected = preChecked;
         div.className = `flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none group mb-2 ${isSelected ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-500"}`;
-        div.dataset.value = point; div.dataset.selected = isSelected ? "true" : "false";
+        div.dataset.value = point;
+        div.dataset.selected = isSelected ? "true" : "false";
+
         const icon = document.createElement('div');
         icon.className = `w-5 h-5 mt-0.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "bg-blue-500 text-white" : "bg-white"}`;
         icon.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        const text = document.createElement('span'); text.className = "text-sm flex-1 font-medium"; text.textContent = point;
+
+        const text = document.createElement('span');
+        text.className = "text-sm flex-1 font-medium";
+        text.textContent = point;
+
         div.onclick = () => {
-            const cur = div.dataset.selected === "true"; div.dataset.selected = !cur ? "true" : "false";
+            const cur = div.dataset.selected === "true";
+            div.dataset.selected = !cur ? "true" : "false";
             div.className = div.dataset.selected === "true" ? `flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none group mb-2 border-blue-500 bg-blue-50 text-blue-700` : `flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none group mb-2 border-gray-200 bg-white text-gray-500`;
             icon.className = `w-5 h-5 mt-0.5 rounded-full border flex items-center justify-center shrink-0 ${div.dataset.selected === "true" ? "bg-blue-500 text-white" : "bg-white"}`;
         };
-        div.appendChild(icon); div.appendChild(text); l.appendChild(div);
+
+        div.appendChild(icon);
+        div.appendChild(text);
+        l.appendChild(div);
     });
 }
 
 async function saveSolutionFromModal() {
-    const m = document.getElementById('sol-manufacturer').value.trim(), n = document.getElementById('sol-name').value.trim(), s = parseFloat(document.getElementById('sol-share').value), note = document.getElementById('sol-note').value.trim();
-    const checked = []; document.getElementById('painpoint-list').querySelectorAll('div[data-selected="true"]').forEach(div => checked.push(div.dataset.value));
+    const m = document.getElementById('sol-manufacturer').value.trim(),
+          n = document.getElementById('sol-name').value.trim(),
+          s = parseFloat(document.getElementById('sol-share').value),
+          note = document.getElementById('sol-note').value.trim();
+          
+    const checked = [];
+    document.getElementById('painpoint-list').querySelectorAll('div[data-selected="true"]').forEach(div => checked.push(div.dataset.value));
+
     if (!n) { showWarningModal("제품명을 입력해주세요."); return; }
-    let res; if (currentSolutionIndexForModal !== null) res = await Store.updateSolution(currentDealId, currentDomainForModal, currentCategoryForModal, currentSolutionIndexForModal, n, s, m, checked, note);
-    else res = await Store.addSolution(currentDealId, currentDomainForModal, currentCategoryForModal, n, s, m, checked, note);
-    if (res === 'SUCCESS') { closeSolutionModal(); await render(); if(refreshCallback) await refreshCallback(); }
-    else showWarningModal(res === 'OVERFLOW' ? "합계 100% 초과 불가" : "저장 실패");
+    
+    let res;
+    if (currentSolutionIndexForModal !== null) {
+        res = await Store.updateSolution(currentDealId, currentDomainForModal, currentCategoryForModal, currentSolutionIndexForModal, n, s, m, checked, note);
+    } else {
+        res = await Store.addSolution(currentDealId, currentDomainForModal, currentCategoryForModal, n, s, m, checked, note);
+    }
+
+    if (res === 'SUCCESS') {
+        closeSolutionModal();
+        await render();
+        if(refreshCallback) await refreshCallback();
+    } else {
+        showWarningModal(res === 'OVERFLOW' ? "합계 100% 초과 불가" : "저장 실패");
+    }
 }
 
 async function showAddDomainInput() {
-    removeTempInputs(); const row = document.createElement('div'); row.className = "temp-input-row bg-white border border-blue-400 rounded-xl p-3 flex items-center gap-2 mb-3 shadow-sm";
-    const input = document.createElement('input'); input.className = "input-enterprise flex-1"; input.placeholder = "새 대분류 이름...";
-    const btnS = createMiniButton(ICONS.check, "text-green-600"), btnC = createMiniButton(ICONS.x, "text-red-500");
-    btnS.onclick = async () => { if (await Store.addDomain(currentDealId, input.value.trim())) { expandedState.add(`d-${input.value.trim()}`); await render(); if(refreshCallback) await refreshCallback(); } };
-    btnC.onclick = () => row.remove(); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnS.onclick(); });
-    row.append(input, btnS, btnC); container.appendChild(row); input.focus();
+    removeTempInputs();
+    const row = document.createElement('div');
+    row.className = "temp-input-row bg-white border border-blue-400 rounded-xl p-3 flex items-center gap-2 mb-3 shadow-sm animate-modal-in";
+    
+    const input = document.createElement('input');
+    input.className = "input-enterprise flex-1";
+    input.placeholder = "새 대분류 이름 (예: Cloud, Data)...";
+    
+    const btnS = createMiniButton(ICONS.check, "text-green-600"),
+          btnC = createMiniButton(ICONS.x, "text-red-500");
+          
+    btnS.onclick = async () => {
+        const val = input.value.trim();
+        if (!val) return;
+        if (await Store.addDomain(currentDealId, val)) {
+            expandedState.add(`d-${val}`);
+            await render();
+            if(refreshCallback) await refreshCallback();
+            showToast(`대분류 '${val}'가 추가되었습니다.`, "success");
+        } else {
+            showToast("이미 존재하는 이름이거나 생성에 실패했습니다.", "error");
+        }
+    };
+    btnC.onclick = () => row.remove();
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnS.onclick(); });
+    
+    row.append(input, btnS, btnC);
+    container.appendChild(row);
+    input.focus();
 }
 
 async function showAddCategoryInput(domain) {
-    if (!expandedState.has(`d-${domain}`)) { expandedState.add(`d-${domain}`); await render(); }
-    const box = document.querySelector(`[data-domain-content="${CSS.escape(domain)}"]`); if (!box) return;
-    removeTempInputs(); const row = document.createElement('div'); row.className = "temp-input-row flex items-center gap-2 p-2 pl-4 bg-white border border-blue-300 rounded-lg shadow-sm";
-    const input = document.createElement('input'); input.className = "input-enterprise flex-1"; input.placeholder = "새 중분류...";
-    const btnS = createMiniButton(ICONS.check, "text-green-600"), btnC = createMiniButton(ICONS.x, "text-red-500");
-    btnS.onclick = async () => { if (await Store.addCategory(currentDealId, domain, input.value.trim())) { await render(); if(refreshCallback) await refreshCallback(); } };
+    if (!expandedState.has(`d-${domain}`)) {
+        expandedState.add(`d-${domain}`);
+        await render();
+    }
+    const box = document.querySelector(`[data-domain-content="${CSS.escape(domain)}"]`);
+    if (!box) return;
+    
+    removeTempInputs();
+    const row = document.createElement('div');
+    row.className = "temp-input-row flex items-center gap-2 p-2 pl-4 bg-white border border-blue-300 rounded-lg shadow-sm animate-modal-in";
+    
+    const input = document.createElement('input');
+    input.className = "input-enterprise flex-1";
+    input.placeholder = "새 중분류 이름...";
+    
+    const btnS = createMiniButton(ICONS.check, "text-green-600"),
+          btnC = createMiniButton(ICONS.x, "text-red-500");
+          
+    btnS.onclick = async () => {
+        const val = input.value.trim();
+        if (!val) return;
+        if (await Store.addCategory(currentDealId, domain, val)) {
+            await render();
+            if(refreshCallback) await refreshCallback();
+        }
+    };
     btnC.onclick = () => row.remove();
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnS.onclick(); });
-    row.append(input, btnS, btnC); box.appendChild(row); input.focus();
+    
+    row.append(input, btnS, btnC);
+    box.appendChild(row);
+    input.focus();
 }
 
 async function showEditCategoryInput(d, o, h) {
-    const t = h.querySelector('.cat-title-text'), orig = t.innerText; t.innerHTML = '';
-    const i = document.createElement('input'); i.value = orig; i.className = "input-enterprise !h-6 text-xs";
+    const t = h.querySelector('.cat-title-text'), orig = t.innerText;
+    t.innerHTML = '';
+    const i = document.createElement('input');
+    i.value = orig;
+    i.className = "input-enterprise !h-6 text-xs";
     i.onkeydown = (e) => { if (e.key === 'Enter') i.blur(); };
-    i.onblur = async () => { if (i.value.trim() && i.value.trim() !== orig) await Store.renameCategory(currentDealId, d, orig, i.value.trim()); await render(); if(refreshCallback) await refreshCallback(); };
+    i.onblur = async () => {
+        const val = i.value.trim();
+        if (val && val !== orig) {
+            await Store.renameCategory(currentDealId, d, orig, val);
+        }
+        await render();
+        if(refreshCallback) await refreshCallback();
+    };
     t.appendChild(i); i.focus();
 }
 
 async function showEditDomainInput(d, h) {
-    const t = h.querySelector('.domain-title-text'), orig = t.innerText; t.innerHTML = '';
-    const i = document.createElement('input'); i.value = orig; i.className = "input-enterprise !h-7 text-sm font-bold";
+    const t = h.querySelector('.domain-title-text'), orig = t.innerText;
+    t.innerHTML = '';
+    const i = document.createElement('input');
+    i.value = orig;
+    i.className = "input-enterprise !h-7 text-sm font-bold";
     i.onkeydown = (e) => { if (e.key === 'Enter') i.blur(); };
-    i.onblur = async () => { if (i.value.trim() && i.value.trim() !== orig) await Store.renameDomain(currentDealId, orig, i.value.trim()); await render(); if(refreshCallback) await refreshCallback(); };
+    i.onblur = async () => {
+        const val = i.value.trim();
+        if (val && val !== orig) {
+            await Store.renameDomain(currentDealId, orig, val);
+        }
+        await render();
+        if(refreshCallback) await refreshCallback();
+    };
     t.appendChild(i); i.focus();
 }
 
 function removeTempInputs() { document.querySelectorAll('.temp-input-row').forEach(el => el.remove()); }
-function createActionButton(ic, cl, ti) { const b = document.createElement('button'); b.innerHTML = ic; b.className = `p-1.5 rounded-md ${cl}`; b.title = ti; return b; }
-function createMiniButton(ic, cl) { const b = document.createElement('button'); b.innerHTML = ic; b.className = `p-1.5 ${cl}`; return b; }
-async function toggleExpand(k) { if (expandedState.has(k)) expandedState.delete(k); else expandedState.add(k); await render(); }
-function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-async function deleteDomain(n) { showConfirmModal(`'${n}' 삭제?`, async () => { await Store.deleteDomain(currentDealId, n); await render(); if(refreshCallback) await refreshCallback(); }); }
-async function deleteCategory(d, n) { showConfirmModal(`'${n}' 삭제?`, async () => { await Store.deleteCategory(currentDealId, d, n); await render(); if(refreshCallback) await refreshCallback(); }); }
-async function deleteSolution(d, c, i) { showConfirmModal("삭제?", async () => { await Store.deleteSolution(currentDealId, d, c, i); await render(); if(refreshCallback) await refreshCallback(); }); }
+
+function createActionButton(ic, cl, ti) {
+    const b = document.createElement('button');
+    b.innerHTML = ic;
+    b.className = `p-1.5 rounded-md transition-colors ${cl}`;
+    b.title = ti;
+    return b;
+}
+
+function createMiniButton(ic, cl) {
+    const b = document.createElement('button');
+    b.innerHTML = ic;
+    b.className = `p-1.5 transition-colors hover:bg-slate-100 rounded ${cl}`;
+    return b;
+}
+
+async function toggleExpand(k) {
+    if (expandedState.has(k)) expandedState.delete(k);
+    else expandedState.add(k);
+    await render();
+}
+
+function escapeHtml(t) {
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
+
+async function deleteDomain(n) {
+    showConfirmModal(`대분류 '${n}'를 삭제하시겠습니까? 하위의 모든 중분류와 솔루션 데이터가 함께 삭제됩니다.`, async () => {
+        const success = await Store.deleteDomain(currentDealId, n);
+        if (success) {
+            expandedState.delete(`d-${n}`);
+            await render();
+            if(refreshCallback) await refreshCallback();
+            showToast(`대분류 '${n}'가 삭제되었습니다.`, "success");
+        } else {
+            showToast("삭제에 실패했습니다.", "error");
+        }
+    });
+}
+
+async function deleteCategory(d, n) {
+    showConfirmModal(`중분류 '${n}'를 삭제하시겠습니까?`, async () => {
+        await Store.deleteCategory(currentDealId, d, n);
+        await render();
+        if(refreshCallback) await refreshCallback();
+    });
+}
+
+async function deleteSolution(d, c, i) {
+    showConfirmModal("솔루션을 삭제하시겠습니까?", async () => {
+        await Store.deleteSolution(currentDealId, d, c, i);
+        await render();
+        if(refreshCallback) await refreshCallback();
+    });
+}
