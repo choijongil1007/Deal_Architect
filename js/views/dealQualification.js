@@ -49,7 +49,7 @@ export async function renderDealQualification(container, dealId, stageId = 'awar
         
         <div class="flex flex-col gap-6">
             <!-- Business Fit Section -->
-            <div class="card-enterprise overflow-hidden border-slate-200 section-qual" data-section="biz">
+            <div class="card-enterprise border-slate-200 section-qual" data-section="biz">
                 <div class="p-5 font-black border-b bg-slate-50 text-slate-900 text-[15px] uppercase tracking-widest flex items-center justify-between cursor-pointer toggle-header-qual hover:bg-slate-100 transition-colors">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-briefcase text-indigo-500"></i> 비즈니스 적합성
@@ -64,7 +64,7 @@ export async function renderDealQualification(container, dealId, stageId = 'awar
             </div>
             
             <!-- Technical Fit Section -->
-            <div class="card-enterprise overflow-hidden border-slate-200 section-qual" data-section="tech">
+            <div class="card-enterprise border-slate-200 section-qual" data-section="tech">
                 <div class="p-5 font-black border-b bg-slate-50 text-slate-900 text-[15px] uppercase tracking-widest flex items-center justify-between cursor-pointer toggle-header-qual hover:bg-slate-100 transition-colors">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-microchip text-indigo-500"></i> 기술적 적합성
@@ -113,7 +113,7 @@ function renderScoreSection(type, stageData, isReadOnly) {
                     <div class="tooltip-trigger ml-2 bg-indigo-600 text-white px-1.5 py-0.5 rounded-md flex items-center gap-1 cursor-help transition-all hover:bg-indigo-700 shadow-sm">
                         <i class="fa-solid fa-wand-magic-sparkles text-[8px]"></i>
                         <span class="text-[9px] font-black">${aiRec.score}</span>
-                        <div class="tooltip-content !w-56 !left-0 !transform-none !ml-2">
+                        <div class="tooltip-content !w-64 !-left-20 md:!-left-32 !transform-none">
                             <div class="font-bold text-indigo-200 mb-1 border-b border-white/10 pb-1">AI 추천 근거 (${aiRec.score}점)</div>
                             <div class="text-[10px] leading-relaxed text-slate-100">${aiRec.reason || '분석 데이터 기반 산출'}</div>
                         </div>
