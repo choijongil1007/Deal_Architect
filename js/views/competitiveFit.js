@@ -422,7 +422,7 @@ Rules:
 4. Section 1: 핵심 고객 요구사항 (Key Requirements)
    - Input KR: ${reqs}
    - Table Columns: 항목, 분석 및 비교.
-   - Analysis Rule: For the comparison column, start with a symbol (O, △, X) followed by a clear, concise comparative sentence. Ensure the cell uses 'text-sm'.
+   - Analysis Rule: In the '분석 및 비교' column, provide a comparative analysis for both products. Use symbols (O, △, X) before EACH product's description within the cell to clearly indicate the fit for both (e.g., "O ${ourProduct}는 ..., △ ${competitor}는 ..."). Ensure the cell uses 'text-sm'.
 5. Section 2: 핵심 기능 요건 (Key Functional Requirements)
    - Input KFR: ${funcReqs}
    - Table Columns: 기능 요건, ${ourProduct}, ${competitor}.
