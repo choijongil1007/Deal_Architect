@@ -201,35 +201,37 @@ function renderResult(result, isStale, stageId) {
 
 function attachEvents(container, dealId, onUpdate) {
     // 1. 이벤트 위임을 통한 전체 클릭 핸들러
-    container.addEventListener('click', async (e) => {
-        const target = e.target;
-        
-        // 1-1. 토글 헤더 (아코디언)
-        const header = target.closest('.toggle-header');
-        if (header) {
-            const card = header.parentElement;
-            const content = card.querySelector('.toggle-content');
-            const icon = card.querySelector('.icon-chevron');
-            const isHidden = content.classList.toggle('hidden');
-            icon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
-            return;
-        }
+    const stagesContainer = container.querySelector('#stages-container');
+    if (stagesContainer) {
+        stagesContainer.addEventListener('click', async (e) => {
+            const target = e.target;
+            
+            // 1-1. 토글 헤더 (아코디언)
+            const header = target.closest('.toggle-header');
+            if (header) {
+                const card = header.parentElement;
+                const content = card.querySelector('.toggle-content');
+                const icon = card.querySelector('.icon-chevron');
+                const isHidden = content.classList.toggle('hidden');
+                icon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+                return;
+            }
 
-        // 1-2. 인사이트 생성 (Analyze)
-        const btnAnalyze = target.closest('.btn-analyze');
-        if (btnAnalyze) {
-            const stageId = btnAnalyze.dataset.stage;
-            const deal = await Store.getDeal(dealId);
-            const stageData = deal.discovery[stageId];
-            if (!stageData.behavior && !stageData.problem) { showToast('정보를 입력해주세요.', 'error'); return; }
+            // 1-2. 인사이트 생성 (Analyze)
+            const btnAnalyze = target.closest('.btn-analyze');
+            if (btnAnalyze) {
+                const stageId = btnAnalyze.dataset.stage;
+                const deal = await Store.getDeal(dealId);
+                const stageData = deal.discovery[stageId];
+                if (!stageData.behavior && !stageData.problem) { showToast('정보를 입력해주세요.', 'error'); return; }
 
-            const card = btnAnalyze.closest('.stage-card');
-            const resultArea = card.querySelector('.result-area');
-            setButtonLoading(btnAnalyze, true, "분석 중...");
-            resultArea.innerHTML = `<div class="animate-pulse flex flex-col items-center py-10"><div class="spinner border-indigo-500 w-8 h-8 mb-4"></div><p class="text-sm text-slate-500">AI 분석 중...</p></div>`;
+                const card = btnAnalyze.closest('.stage-card');
+                const resultArea = card.querySelector('.result-area');
+                setButtonLoading(btnAnalyze, true, "분석 중...");
+                resultArea.innerHTML = `<div class="animate-pulse flex flex-col items-center py-10"><div class="spinner border-indigo-500 w-8 h-8 mb-4"></div><p class="text-sm text-slate-500">AI 분석 중...</p></div>`;
 
-            try {
-                const prompt = `Role: Senior B2B Sales Strategist. Stage: ${stageId}.
+                try {
+                    const prompt = `Role: Senior B2B Sales Strategist. Stage: ${stageId}.
 Analyze following customer signals: 
 - Behavior: ${stageData.behavior}
 - Problem: ${stageData.problem}
@@ -244,36 +246,37 @@ Rules:
 3. Items should represent what needs to be agreed upon or confirmed at this business level.
 4. Return JSON ONLY: { "jtbd": [], "sc": [] }. Language: Korean.`;
 
-                const result = await callGemini(prompt);
-                
-                const freshDeal = await Store.getDeal(dealId);
-                freshDeal.discovery[stageId].result = result;
-                freshDeal.discovery[stageId].frozen = true;
-                await Store.saveDeal(freshDeal);
-                
-                resultArea.innerHTML = renderResult(result, false, stageId);
-                
-                const badge = card.querySelector('.status-badge');
-                if (badge) {
-                    badge.innerHTML = '<span class="text-xs text-emerald-600 font-bold flex items-center gap-1.5 mt-0.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-circle-check"></i> 분석 완료</span>';
+                    const result = await callGemini(prompt);
+                    
+                    const freshDeal = await Store.getDeal(dealId);
+                    freshDeal.discovery[stageId].result = result;
+                    freshDeal.discovery[stageId].frozen = true;
+                    await Store.saveDeal(freshDeal);
+                    
+                    resultArea.innerHTML = renderResult(result, false, stageId);
+                    
+                    const badge = card.querySelector('.status-badge');
+                    if (badge) {
+                        badge.innerHTML = '<span class="text-xs text-emerald-600 font-bold flex items-center gap-1.5 mt-0.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100"><i class="fa-solid fa-circle-check"></i> 분석 완료</span>';
+                    }
+
+                    showToast('분석 완료', 'success');
+                    if (onUpdate) await onUpdate();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                    resultArea.innerHTML = '';
+                } finally {
+                    setButtonLoading(btnAnalyze, false);
                 }
-
-                showToast('분석 완료', 'success');
-                if (onUpdate) await onUpdate();
-            } catch (err) {
-                showToast(err.message, 'error');
-                resultArea.innerHTML = '';
-            } finally {
-                setButtonLoading(btnAnalyze, false);
+                return;
             }
-            return;
-        }
 
-        // 1-3. 보고서 생성 버튼들 (Event Delegation)
-        if (target.closest('.btn-gen-problem-def')) { generateProblemDefinition(dealId); return; }
-        if (target.closest('.btn-gen-decision-crit')) { generateDecisionCriteria(dealId); return; }
-        if (target.closest('.btn-gen-success-guide')) { generateProjectSuccessGuide(dealId); return; }
-    });
+            // 1-3. 보고서 생성 버튼들 (Event Delegation)
+            if (target.closest('.btn-gen-problem-def')) { generateProblemDefinition(dealId); return; }
+            if (target.closest('.btn-gen-decision-crit')) { generateDecisionCriteria(dealId); return; }
+            if (target.closest('.btn-gen-success-guide')) { generateProjectSuccessGuide(dealId); return; }
+        });
+    }
 
     // 2. 텍스트 입력 및 자동 저장 (이벤트 위임 대신 개별 바인딩 유지 - 입력 성능 고려)
     container.querySelectorAll('.input-enterprise').forEach(input => {
