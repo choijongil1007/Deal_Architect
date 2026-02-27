@@ -242,7 +242,7 @@ function renderNodes(container, layoutNodes) {
                                 <h4 class="text-lg font-black text-white leading-tight mb-3 border-b border-white/10 pb-2">${node.name}</h4>
                                 <div class="flex justify-between items-end">
                                     <div class="flex flex-col">
-                                        <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wider">시장 점유율</span>
+                                        <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wider">점유율</span>
                                         <span class="text-3xl font-black text-indigo-400 leading-none mt-0.5">${s}<span class="text-sm ml-0.5 text-slate-500">%</span></span>
                                     </div>
                                     ${node.data?.painPoints?.length > 0 ? `
