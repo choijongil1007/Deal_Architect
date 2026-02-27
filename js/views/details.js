@@ -187,7 +187,6 @@ function validateStageTransition(deal) {
         checks.push({ label: 'Deal Qualification 완료', valid: isQualDone });
         const hasMap = Object.keys(deal.solutionMapContent || {}).length > 0;
         checks.push({ label: 'Solution Map 수립', valid: hasMap });
-        checks.push({ label: '검토 기준 정의서 생성 완료', valid: hasReportType('decision_preconditions') });
     } else if (stage === 'evaluation') {
         checks.push({ label: discoveryCheckLabel, valid: disc.insight });
         checks.push({ label: 'Competitive Fit 완료', valid: !!(deal.competitive && deal.competitive.result) });

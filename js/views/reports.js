@@ -8,7 +8,7 @@ let currentDealId = null;
 // 단계별 보고서 타입 매핑
 const STAGE_REPORT_MAP = {
     awareness: ['problem_definition'],
-    consideration: ['decision_preconditions', 'qualification_report'],
+    consideration: ['qualification_report'],
     evaluation: ['decision_criteria', 'competitive_insight', 'tws'],
     purchase: ['success_guide', 'dws']
 };

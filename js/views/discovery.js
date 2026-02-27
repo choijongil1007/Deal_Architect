@@ -169,13 +169,7 @@ function renderResult(result, isStale, stageId) {
             </div>
         `;
     } else if (stageId === 'consideration') {
-        extraActionHtml = `
-            <div class="mt-8 pt-6 border-t border-slate-100 flex justify-center">
-                <button class="btn-gen-decision-pre bg-slate-900 hover:bg-indigo-600 shadow-md active:scale-95 text-white px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 justify-center min-w-[200px]">
-                    <i class="fa-solid fa-wand-magic-sparkles text-yellow-300 text-xs"></i> 검토 기준 정의서 생성
-                </button>
-            </div>
-        `;
+        extraActionHtml = '';
     } else if (stageId === 'evaluation') {
         extraActionHtml = `
             <div class="mt-8 pt-6 border-t border-slate-100 flex justify-center">
@@ -277,7 +271,6 @@ Rules:
 
         // 1-3. 보고서 생성 버튼들 (Event Delegation)
         if (target.closest('.btn-gen-problem-def')) { generateProblemDefinition(dealId); return; }
-        if (target.closest('.btn-gen-decision-pre')) { generateDecisionPreconditions(dealId); return; }
         if (target.closest('.btn-gen-decision-crit')) { generateDecisionCriteria(dealId); return; }
         if (target.closest('.btn-gen-success-guide')) { generateProjectSuccessGuide(dealId); return; }
     });
@@ -525,90 +518,7 @@ Language: Korean. Return Markdown format text.`;
 }
 
 /**
- * 고려 단계 정보를 바탕으로 검토 기준 정의서 초안 생성
- */
-async function generateDecisionPreconditions(dealId) {
-    const deal = await Store.getDeal(dealId);
-    const disc = deal.discovery.consideration?.result;
-    if (!disc || !disc.jtbd) {
-        showToast("고려 단계의 Discovery 인사이트를 먼저 생성해주세요.", "error");
-        return;
-    }
-
-    const clientName = deal.clientName || "고객사";
-    const jtbdList = Array.isArray(disc.jtbd) ? disc.jtbd.join("\n- ") : disc.jtbd;
-    const scList = Array.isArray(disc.sc) ? disc.sc.join("\n- ") : disc.sc;
-
-    const loader = document.getElementById('global-loader');
-    loader.classList.remove('hidden');
-
-    try {
-        const prompt = `당신은 B2B 프리세일즈 전문가입니다.
-이 문서는 다음 단계로 넘기기 위한 게이트 문서가 아니며, Go/No-Go 판단을 위한 문서가 아닙니다.
-이 문서는 이미 정의된 JTBD를 ‘어떤 기준과 조건에서 검토해야 하는지’를 정리하는 고려 단계(Consideration)의 산출물입니다.
-
-[절대 금지 사항]
-- 다음 단계, 평가 단계, 전환, 게이트라는 개념 언급 금지
-- 회사 전체의 의사결정 기준 작성 금지
-- 전략, 시장, 재무, 투자, ROI 관점의 일반론 작성 금지
-- “전략적 부합성”, “시장성”, “재무 타당성” 같은 범용 프레임워크 사용 금지
-- Go/No-Go 체크리스트 작성 금지
-- JTBD와 직접 연결되지 않는 기준 생성 금지
-- 해결책, 기술, 제품, 실행 방안 언급 금지
-
-[강제 원칙]
-- 제공된 JTBD는 이 문서의 유일한 출발점(Source of Truth)입니다
-- 모든 검토 기준은 ‘선택을 가능하게 만드는 조건’이어야 합니다
-- 검토 기준의 목적은 ‘아무 선택이나 하지 않게 만드는 것’입니다
-- 검토 기준은 사고를 정리하기 위한 것이지, 결정을 강제하지 않습니다
-- 고객 관점에서, 중립적이고 판단을 돕는 언어만 사용하세요
-
-[입력 데이터]
-고객사: ${clientName}
-JTBD 목록:
-- ${jtbdList}
-
-Success Criteria 목록:
-- ${scList}
-
-[출력 문서 구조 (강제)]
-# 검토 기준 정의서 (JTBD 기반)
-
-## 문서 목적
-이 문서는 정의된 JTBD를 어떤 기준과 조건에서 검토해야 하는지 정리하기 위한 문서입니다. 특정 선택이나 결정을 유도하지 않습니다.
-
----
-
-## JTBD 1에 대한 검토 기준
-[연결된 JTBD]
-- {{해당 JTBD 원문}}
-
-[검토 기준]
-- 이 JTBD를 검토할 때 반드시 전제되어야 할 조건
-- 이 조건이 충족되지 않을 경우, 검토 자체가 왜 왜곡될 수 있는지에 대한 설명
-- 이 기준이 없을 때 발생할 수 있는 판단상의 혼란
-
-(※ JTBD 개수만큼 위 섹션 반복)
-
----
-
-## 요약 문장 (의사결정자용)
-- 각 JTBD를 검토할 때 공통적으로 유지되어야 할 기준
-- 이 기준들이 왜 지금 정리되어야 하는지에 대한 요약
-
-Language: Korean. Return Markdown format text.`;
-
-        const resultRaw = await callGemini(prompt);
-        openReportEditor(resultRaw, dealId, 'decision_preconditions', false);
-    } catch (e) {
-        showToast("생성 실패: " + e.message, "error");
-    } finally {
-        loader.classList.add('hidden');
-    }
-}
-
-/**
- * 평가 단계 정보를 바탕으로 판단 기준 정의서 초안 생성
+ * 평가 단계 정보를 바탕으로 평가 기준 정의서 초안 생성
  */
 async function generateDecisionCriteria(dealId) {
     const deal = await Store.getDeal(dealId);
